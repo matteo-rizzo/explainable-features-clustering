@@ -1,34 +1,35 @@
 from torch.utils.data import DataLoader
 
-from classes.Plotter import Plotter
+from classes.Vocabulary import Vocabulary
 from classes.clusterizers.Clusterizer import Clusterizer
+from classes.core.Trainer import Trainer
 from classes.dataset.MNISTDataset import MNISTDataset
 from classes.feature_descriptors.FeatureDescriptor import FeatureDescriptor
 from classes.key_points_extractors.KeyPointsExtractor import KeyPointsExtractor
 
 
 def main():
-    dataset = MNISTDataset()
-    dataloader = DataLoader(dataset)
+    data = {
+        "train": DataLoader(MNISTDataset(train=True)),
+        "test": DataLoader(MNISTDataset(train=False))
+    }
 
     key_points_extractor = KeyPointsExtractor()
     feature_descriptor = FeatureDescriptor()
-    data, features = [], []
+    key_points, features = [], []
 
-    for (x, _, _) in dataloader:
-        data.append(key_points_extractor.extract(x))
+    for (x, _, _) in data["train"]:
+        key_points.append(key_points_extractor.extract(x))
         features.append(feature_descriptor.describe(x))
 
     clusterizer = Clusterizer()
     clusters = clusterizer.cluster(features)
     ranking = clusterizer.rank_clusters(clusters)
 
-    plotter = Plotter()
-    plotter.plot_clusters(ranking[:10])
+    vocabulary = Vocabulary()
+    vocabulary.build(ranking)
 
-    ranked_features = clusterizer.rank_features(features, ranking)
-    for key_points, (_, importance) in zip(data, ranked_features):
-        plotter.plot_importance(key_points, importance)
+    Trainer().train(data)
 
 
 if __name__ == "__main__":
