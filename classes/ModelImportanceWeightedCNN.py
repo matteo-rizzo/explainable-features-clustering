@@ -1,22 +1,25 @@
-from typing import Union, Dict
+from typing import Union, Dict, Tuple
 
 import torch
+from torch import Tensor
 
+from classes.ImportanceWeightedCNN import ImportanceWeightedCNN
 from classes.factories.CriterionFactory import CriterionFactory
 from classes.factories.OptimizerFactory import OptimizerFactory
 
 
-class Model:
+class ModelImportanceWeightedCNN:
 
     def __init__(self, device: torch.device):
         self._device = device
-        self._network, self.__optimizer, self.__criterion = None, None, None
+        self._network = ImportanceWeightedCNN()
+        self.__optimizer, self.__criterion = None, None
 
-    def predict(self, x: Union[torch.Tensor, Dict]) -> Union[tuple, torch.Tensor]:
+    def predict(self, x: Union[Tensor, Dict]) -> Union[Tuple, Tensor]:
         """
         Performs a prediction using the network and returns the output logits
         """
-        return self._network(x.float().to(self._device))
+        return self._network(x.float())
 
     def print_model_overview(self):
         """
@@ -38,7 +41,7 @@ class Model:
         """
         self._network = self._network.eval()
 
-    def get_loss(self, o: torch.Tensor, y: torch.Tensor) -> float:
+    def get_loss(self, o: Tensor, y: Tensor) -> float:
         """
         Computes the loss for the given logits and ground truth
         :param o: the logits
@@ -47,11 +50,18 @@ class Model:
         """
         return self.__criterion(o, y).item()
 
+    @staticmethod
+    def get_accuracy(o: Tensor, y: Tensor, total: int, correct: int) -> Tuple:
+        _, predicted = torch.max(o.data, 1)
+        total += y.size(0)
+        correct += (predicted == y).sum().item()
+        return total, correct
+
     def reset_gradient(self):
         """ Zeros out all the accumulated gradients """
         self.__optimizer.zero_grad()
 
-    def update_weights(self, o: torch.Tensor, y: torch.Tensor) -> float:
+    def update_weights(self, o: Tensor, y: Tensor) -> float:
         """
         Updates the weights of the model performing backpropagation
         :param o: the output of the forward step
