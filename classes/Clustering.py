@@ -1,4 +1,5 @@
-from typing import List
+import itertools
+from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,7 +15,7 @@ from classes.SIFT import SIFT
 
 class KMeansClustering:
 
-    def __init__(self, n_clusters: int = 100):
+    def __init__(self, n_clusters: int = 10):
         self.__clustering = KMeans(n_clusters=n_clusters, n_init='auto', random_state=0)
 
     @staticmethod
@@ -47,12 +48,12 @@ class KMeansClustering:
 
         return optimal_n_clusters
 
-    def plot_sample(self, data: np.ndarray, centroids: np.ndarray, labels: List, sample_size: int = 100000):
+    def plot_sample(self, data: np.ndarray, centroids: np.ndarray, labels: List, sample_size: int = 1000):
         sample = np.random.randint(0, len(data), size=sample_size)
         color_map = self.__get_color_map(len(centroids))
-        for i in tqdm(sample):
+        for i in tqdm(sample, desc="Plotting sample data points"):
             plt.scatter(data[i][0], data[i][1], c=color_map(labels[i]), alpha=0.5)
-        for i in range(len(centroids)):
+        for i in tqdm(range(len(centroids)), desc="Plotting sample centroids"):
             plt.scatter(centroids[i][0], centroids[i][1], marker='x', s=100, linewidths=3, c='k')
         plt.show()
 
@@ -64,34 +65,29 @@ class KMeansClustering:
         return self.__clustering.fit(data)
 
     @staticmethod
-    def rank_clusters(data: np.ndarray, centroids: np.ndarray, labels: List) -> List[int]:
-        cluster_variances = []
-        for i in range(np.max(labels) + 1):
-            cluster_variances.append(np.var(data[labels == i], axis=0))
+    def rank_clusters(data: np.ndarray, centroids: np.ndarray, labels: List) -> List[Tuple]:
+        clusters_ranking = []
+        for i in tqdm(range(np.max(labels) + 1), desc="Ranking clusters"):
+            cluster_variance = np.var(data[labels == i], axis=0)
+            cluster_distance = np.linalg.norm(data[labels == i] - centroids[i], axis=1)
+            clusters_ranking.append((i, np.sum(cluster_variance) / np.sum(cluster_distance)))
 
-        cluster_distances = []
-        for i in range(np.max(labels) + 1):
-            distances = np.linalg.norm(data[labels == i] - centroids[i], axis=1)
-            cluster_distances.append(distances)
+        for i, ranking in enumerate(clusters_ranking):
+            print(f"Cluster {i}: Importance Score = {ranking}")
 
-        cluster_importances = []
-        for i in range(np.max(labels) + 1):
-            importance = np.sum(cluster_variances[i]) / np.sum(cluster_distances[i])
-            cluster_importances.append(importance)
-
-        for i, importance in enumerate(cluster_importances):
-            print(f"Cluster {i}: Importance Score = {importance}")
-
-        return cluster_importances
+        return sorted(clusters_ranking, key=lambda x: x[1], reverse=True)
 
 
 if __name__ == "__main__":
     dataset = MNISTDataset()
     dataloader = DataLoader(dataset, shuffle=True)
 
+    sample_size = 10
+    dataloader = list(itertools.islice(dataloader, sample_size))
+
     sift = SIFT()
     descriptors, paths_to_file = [], []
-    for (x, _, path_to_file) in tqdm(dataloader):
+    for (x, _, path_to_file) in tqdm(dataloader, desc="Generating descriptors using SIFT"):
         img = x.squeeze(0).permute(1, 2, 0).numpy()
         _, img_descriptors = sift.run(img)
         if img_descriptors is not None:
@@ -105,16 +101,18 @@ if __name__ == "__main__":
     clustering = KMeansClustering()
 
     clusters = clustering.run(flat_descriptors)
-    labels, centroids = clusters.labels_, clusters.cluster_centers_
-    clustering.plot_sample(flat_descriptors, centroids, labels, sample_size=400000)
-    ranking = clustering.rank_clusters(flat_descriptors, centroids, labels)
+    clusters_labels, clusters_centroids = clusters.labels_, clusters.cluster_centers_
+    clustering.plot_sample(flat_descriptors, clusters_centroids, clusters_labels)
+    clusters_ranking = clustering.rank_clusters(flat_descriptors, clusters_centroids, clusters_labels)
 
     clustered_data, idx = [], 0
-    for des, path_to_file in tqdm(zip(descriptors, paths_to_file)):
-        if des is None:
+    for img_descriptors, path_to_file in tqdm(zip(descriptors, paths_to_file), desc="Packing data"):
+        if img_descriptors is None:
             continue
-        num_img_des = des.shape[0]
-        img_labels = labels[idx:idx + num_img_des]
-        img_rankings = ranking[idx:idx + num_img_des]
-        clustered_data.append((img_labels, img_rankings, path_to_file, des))
+        num_img_des = img_descriptors.shape[0]
+        des_clusters_labels = clusters_labels[idx:idx + num_img_des]
+        des_clusters_rankings = [rank for i in des_clusters_labels for (j, rank) in clusters_ranking if i == j]
+        print(des_clusters_labels, des_clusters_rankings)
+        img_data = (des_clusters_labels, des_clusters_rankings, path_to_file, img_descriptors)
+        clustered_data.append(img_data)
         idx += num_img_des

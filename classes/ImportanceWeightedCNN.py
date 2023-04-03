@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch import Tensor, nn
 
@@ -13,3 +14,6 @@ class ImportanceWeightedCNN(CNN):
     def forward(self, x: Tensor) -> Tensor:
         x = x * self.__importance_weight
         return super().foward(x)
+
+    def get_importance_weights(self) -> np.ndarray:
+        return self.__importance_weight.detach().numpy()

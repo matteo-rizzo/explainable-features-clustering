@@ -1,8 +1,11 @@
+import numpy as np
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from classes.Clustering import KMeansClustering
 from classes.MNISTDataset import MNISTDataset
 from classes.ModelImportanceWeightedCNN import ModelImportanceWeightedCNN
+from classes.SIFT import SIFT
 from functional.setup import get_device
 
 DEVICE_TYPE = "cpu"
@@ -15,6 +18,16 @@ EPOCHS = 15
 def main():
     train_loader = DataLoader(MNISTDataset(train=True), batch_size=64, shuffle=True, num_workers=2)
     test_loader = DataLoader(MNISTDataset(train=False), batch_size=64, shuffle=False, num_workers=2)
+
+    sift = SIFT()
+    _, descriptors = sift.get_descriptors(train_loader)
+    flat_descriptors = np.concatenate(descriptors)
+
+    clustering = KMeansClustering()
+    clusters = clustering.run(flat_descriptors)
+    labels, centroids = clusters.labels_, clusters.cluster_centers_
+    clustering.plot_sample(flat_descriptors, centroids, labels, sample_size=400000)
+    ranking = clustering.rank_clusters(flat_descriptors, centroids, labels)
 
     device = get_device(DEVICE_TYPE)
 

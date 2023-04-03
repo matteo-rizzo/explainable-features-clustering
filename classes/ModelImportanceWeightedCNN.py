@@ -1,5 +1,6 @@
 from typing import Union, Dict, Tuple
 
+import numpy as np
 import torch
 from torch import Tensor
 
@@ -106,3 +107,6 @@ class ModelImportanceWeightedCNN:
         """
         print("\n Loading model... \n")
         self._network.load_state_dict(torch.load(path_to_model))
+
+    def get_importance_weights(self) -> np.ndarray:
+        return self._network.get_importance_weights()

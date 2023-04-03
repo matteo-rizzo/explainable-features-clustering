@@ -1,9 +1,10 @@
-from typing import Tuple
+from typing import Tuple, List
 
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from classes.MNISTDataset import MNISTDataset
 
@@ -28,6 +29,40 @@ class SIFT:
     def run(self, img: np.ndarray) -> Tuple[Tuple, np.ndarray]:
         return self.__sift.detectAndCompute(img, None)
 
+    @staticmethod
+    def plot_keypoints(img: np.ndarray, keypoints: Tuple):
+        plt.imshow(cv2.drawKeypoints(img, keypoints, None))
+        plt.show()
+        plt.clf()
+
+    def get_descriptors(self, dataloader: DataLoader) -> List:
+        descriptors = []
+        for (x, _, _) in tqdm(dataloader, desc="Generating descriptors using SIFT"):
+            img = x.squeeze(0).permute(1, 2, 0).numpy()
+            _, img_descriptors = self.run(img)
+            if img_descriptors is not None:
+                descriptors.append(img_descriptors)
+        return descriptors
+
+    def get_keypoints(self, dataloader: DataLoader) -> List:
+        keypoints = []
+        for (x, _, _) in tqdm(dataloader, desc="Generating keypoints using SIFT"):
+            img = x.squeeze(0).permute(1, 2, 0).numpy()
+            img_keypoints, _ = self.run(img)
+            if img_keypoints is not None:
+                keypoints.append(img_keypoints)
+        return keypoints
+
+    def get_descriptors_and_keypoints(self, dataloader: DataLoader) -> Tuple[List, List]:
+        descriptors, keypoints = [], []
+        for (x, _, _) in tqdm(dataloader, desc="Generating keypoints and descriptors using SIFT"):
+            img = x.squeeze(0).permute(1, 2, 0).numpy()
+            img_keypoints, img_descriptors = self.run(img)
+            if img_descriptors is not None:
+                keypoints.append(img_keypoints)
+                descriptors.append(img_descriptors)
+        return keypoints, descriptors
+
 
 if __name__ == "__main__":
     dataset = MNISTDataset()
@@ -37,5 +72,4 @@ if __name__ == "__main__":
     for (x, _, _) in dataloader:
         img = x.squeeze(0).permute(1, 2, 0).numpy()
         kp, des = sift.run(img)
-        plt.imshow(cv2.drawKeypoints(img, kp, None))
-        plt.show()
+        sift.plot_keypoints(img, kp)
