@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 from classes.Clustering import KMeansClustering
 from classes.MNISTDataset import MNISTDataset
-from classes.ModelImportanceWeightedCNN import ModelImportanceWeightedCNN
+from classes.deep_learning.models.ModelImportanceWeightedCNN import ModelImportanceWeightedCNN
 from classes.SIFT import SIFT
 from functional.setup import get_device
 
@@ -58,8 +58,11 @@ def main():
 
         test_loss, test_accuracy = running_loss / len(test_loader), 100 * correct / total
 
-        print('Epoch [%d], train loss: %.3f, train accuracy: %.3f, test loss: %.3f, test accuracy: %.3f' % (
-            epoch + 1, train_loss, train_accuracy, test_loss, test_accuracy))
+        print(f'Epoch [{epoch + 1:d}], '
+              f'train loss: {train_loss:.3f}, '
+              f'train accuracy: {train_accuracy:.3f}, '
+              f'test loss: {test_loss:.3f}, '
+              f'test accuracy: {test_accuracy:.3f}')
 
 
 if __name__ == "__main__":

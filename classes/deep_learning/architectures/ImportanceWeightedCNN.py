@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch import Tensor, nn
 
-from classes.CNN import CNN
+from classes.deep_learning.architectures.CNN import CNN
 
 
 class ImportanceWeightedCNN(CNN):

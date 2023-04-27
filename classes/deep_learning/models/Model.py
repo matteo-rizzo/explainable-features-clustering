@@ -4,16 +4,15 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from classes.ImportanceWeightedCNN import ImportanceWeightedCNN
 from classes.factories.CriterionFactory import CriterionFactory
 from classes.factories.OptimizerFactory import OptimizerFactory
 
 
-class ModelImportanceWeightedCNN:
+class Model:
 
-    def __init__(self, device: torch.device):
+    def __init__(self, device: torch.device, architecture):
         self._device = device
-        self._network = ImportanceWeightedCNN()
+        self._network = architecture
         self.__optimizer, self.__criterion = None, None
 
     def predict(self, x: Union[Tensor, Dict]) -> Union[Tuple, Tensor]:
@@ -42,34 +41,34 @@ class ModelImportanceWeightedCNN:
         """
         self._network = self._network.eval()
 
-    def get_loss(self, o: Tensor, y: Tensor) -> float:
+    def get_loss(self, logits: Tensor, gt: Tensor) -> float:
         """
         Computes the loss for the given logits and ground truth
-        :param o: the logits
-        :param y: the ground truth
+        :param logits: the logits
+        :param gt: the ground truth
         :return: the loss value based on the set criterion
         """
-        return self.__criterion(o, y).item()
+        return self.__criterion(logits, gt).item()
 
     @staticmethod
-    def get_accuracy(o: Tensor, y: Tensor, total: int, correct: int) -> Tuple:
-        _, predicted = torch.max(o.data, 1)
-        total += y.size(0)
-        correct += (predicted == y).sum().item()
+    def get_accuracy(logits: Tensor, gt: Tensor, total: int, correct: int) -> Tuple:
+        _, predicted = torch.max(logits.data, 1)
+        total += gt.size(0)
+        correct += (predicted == gt).sum().item()
         return total, correct
 
     def reset_gradient(self):
         """ Zeros out all the accumulated gradients """
         self.__optimizer.zero_grad()
 
-    def update_weights(self, o: Tensor, y: Tensor) -> float:
+    def update_weights(self, logits: Tensor, gt: Tensor) -> float:
         """
         Updates the weights of the model performing backpropagation
-        :param o: the output of the forward step
-        :param y: the ground truth
+        :param logits: the output of the forward step
+        :param gt: the ground truth
         :return: the loss value for the current update of the weights
         """
-        loss = self.__criterion(o, y)
+        loss = self.__criterion(logits, gt)
         loss.backward()
         self.__optimizer.step()
         return loss.item()
