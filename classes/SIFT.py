@@ -64,7 +64,7 @@ class SIFT:
         return keypoints, descriptors
 
 
-if __name__ == "__main__":
+def main():
     dataset = MNISTDataset()
     dataloader = DataLoader(dataset, shuffle=True)
     sift = SIFT()
@@ -73,3 +73,7 @@ if __name__ == "__main__":
         img = x.squeeze(0).permute(1, 2, 0).numpy()
         kp, des = sift.run(img)
         sift.plot_keypoints(img, kp)
+
+
+if __name__ == "__main__":
+    main()

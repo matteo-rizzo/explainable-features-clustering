@@ -1,5 +1,5 @@
 import numpy as np
-from classes.KMeansClustering import KMeansClustering
+from classes.Clustering import KMeansClustering
 from classes.core.Trainer import Trainer
 from sklearn.metrics import accuracy_score
 from sklearn.svm import LinearSVC

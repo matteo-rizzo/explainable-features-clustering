@@ -78,7 +78,7 @@ class KMeansClustering:
         return sorted(clusters_ranking, key=lambda x: x[1], reverse=True)
 
 
-if __name__ == "__main__":
+def main():
     dataset = MNISTDataset()
     dataloader = DataLoader(dataset, shuffle=True)
 
@@ -116,3 +116,7 @@ if __name__ == "__main__":
         img_data = (des_clusters_labels, des_clusters_rankings, path_to_file, img_descriptors)
         clustered_data.append(img_data)
         idx += num_img_des
+
+
+if __name__ == "__main__":
+    main()
