@@ -8,7 +8,7 @@ from classes.factories.CriterionFactory import CriterionFactory
 from classes.factories.OptimizerFactory import OptimizerFactory
 
 
-class Model:
+class TrainableModel:
 
     def __init__(self, device: torch.device, architecture):
         self._device = device

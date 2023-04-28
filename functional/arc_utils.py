@@ -20,11 +20,11 @@ def parse_model(layout: dict, logger):
     :param logger: ogger object that is used to print debug information
     :return:  nn.Sequential model, sorted list of layers
     """
-    logger.info(f'{"":>3}{"from":>18}{"n":>3}{"params":>10}  {"module":<40}{"arguments":<30}')
+    logger.info(f'{"idx":>1}{"from":>18}{"n":>3}{"params":>10}  {"module":<40}{"arguments":<30}')
     input_channels: list[int] = [layout['class_number']]
 
     layers, save, output_channel = [], [], input_channels[-1]  # layers, savelist, ch out
-    for idx, (fr, num, module, params) in enumerate(layout['backbone'] + layout['head']):
+    for idx, (fr, num_repetitions, module, params) in enumerate(layout['backbone'] + layout['head']):
         # Evaluate the module if read as string, else pass directly (e.g. "Conv" -> Conv module)
         module = eval(module) if isinstance(module, str) else module
         # Evaluate parameters if read as strings, else pass them directly (e.g. "1" -> 1)
@@ -38,13 +38,16 @@ def parse_model(layout: dict, logger):
             params = []
         else:
             output_channel = input_channels[fr]
-
-        m_ = nn.Sequential(*[module(*params) for _ in range(num)]) if num > 1 else module(*params)  # module
+        # applied num times, or just once
+        module_applied = (nn.Sequential(*[module(*params) for _ in range(num_repetitions)])
+                          if num_repetitions > 1 else module(*params))
         module_type = str(module)[8:-2].replace('__main__.', '')  # module type
-        np = sum([x.numel() for x in m_.parameters()])  # number params
-        m_.i, m_.f, m_.type, m_.np = idx, fr, module_type, np  # attach index, 'from' index, type, number params
-        logger.info(f'{idx:>3}{fr:>18}{num:>3}{np:10.0f}  {module_type:<40}{params}')  # print
-        layers.append(m_)
+        parameter_number = sum([x.numel() for x in module_applied.parameters()])  # number params
+        # attach index, 'from' index, type, number params
+        module_applied.layer_index, module_applied.from_layer, \
+            module_applied.type, module_applied.parameter_number = idx, fr, module_type, parameter_number
+        logger.info(f'{idx:>3}{fr:>18}{num_repetitions:>3}{parameter_number:10.0f}  {module_type:<40}{params}')  # print
+        layers.append(module_applied)
         if idx == 0:
             input_channels = []
         input_channels.append(output_channel)
