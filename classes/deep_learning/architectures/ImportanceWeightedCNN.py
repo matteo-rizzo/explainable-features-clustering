@@ -12,7 +12,8 @@ class ImportanceWeightedCNN(CNN):
 
     def __init__(self, config_path: str = "config/architectures/importance_weighted_cnn.yaml",
                  logger: logging.Logger = logging.getLogger(__name__)):
-        super(ImportanceWeightedCNN, self).__init__(logger=logger)
+        super(ImportanceWeightedCNN, self).__init__(config_path=config_path,
+                                                    logger=logger)
         self.__importance_weight = nn.Parameter(torch.ones(1, 3, 32, 32))
         # self.model.insert(0, self.__importance_weight)
 

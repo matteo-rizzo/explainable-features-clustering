@@ -2,8 +2,11 @@ from pathlib import Path
 from typing import Optional
 
 import torch
+import torch.nn as nn
 import yaml
 
+from classes.deep_learning.architectures.TorchModel import TorchModel
+from functional.lr_schedulers import linear, one_cycle
 from functional.setup import get_device
 from functional.utils import intersect_dicts
 
@@ -15,7 +18,7 @@ from functional.utils import intersect_dicts
 
 class Trainer:
 
-    def __init__(self, config: dict, hyperparameters: dict, logger):
+    def __init__(self, model_class: TorchModel, config: dict, hyperparameters: dict, logger):
         self.config = config
         self.hyperparameters = hyperparameters
         self.logger = logger
@@ -28,8 +31,9 @@ class Trainer:
         # self.compute_loss_ota = None
         # self.compute_loss = None
         # ---
-        self.device: Optional[torch.device] = None
+        self.device: Optional[torch.device] = get_device(config["device"])
         # ---
+        self.model_class = model_class
         self.model = None
         self.checkpoint = None
 
@@ -111,14 +115,11 @@ class Trainer:
             yaml.dump(vars(self.config), f, sort_keys=False)
         return save_dir, weights_dir, last_ckpt, best_ckpt, results_file
 
-    def __setup_model(self, pretrained, class_number):
+    def __setup_model(self, pretrained: bool):
         if pretrained:
             self.checkpoint = torch.load(self.config["weights"], map_location=self.device)  # load checkpoint
-            self.model = Model(self.config["cfg"] or self.checkpoint['model'].yaml,
-                               ch=3,
-                               nc=class_number,
-                               anchors=self.hyperparameters.get('anchors'),
-                               logger=self.logger).to(self.device)
+            self.model = self.model_class(config_path=self.config["cfg"] or self.checkpoint['model'].yaml,
+                                          logger=self.logger).to(self.device)
             state_dict = self.checkpoint['model'].float().state_dict()  # to FP32
             state_dict = intersect_dicts(state_dict, self.model.state_dict(), exclude=[])  # intersect
             self.model.load_state_dict(state_dict, strict=False)  # load
@@ -126,20 +127,118 @@ class Trainer:
                 f'Transferred {len(state_dict):g}/{len(self.model.state_dict()):g} '
                 f'items from {self.config["weights"]}')  # report
         else:
-            self.model = Model(self.config["cfg"],
-                               ch=3,
-                               nc=class_number,
-                               anchors=self.hyperparameters.get('anchors'),
-                               logger=self.logger).to(self.device)
+            self.model = self.model_class(config_path=self.config["cfg"], logger=self.logger).to(self.device)
+
+    def __setup_gradient_accumulation(self):
+        # If the total batch size is less than or equal to the nominal batch size, then accumulate is set to 1.
+        # Accumulate losses before optimizing
+        accumulate = max(round(self.config["nominal_batch_size"] / self.config["batch_size"]), 1)
+        # Scale weight_decay
+        self.hyperparameters['weight_decay'] *= (self.config["batch_size"] * accumulate
+                                                 / self.config["nominal_batch_size"])
+        self.logger.info(f"Scaled weight_decay = {self.hyperparameters['weight_decay']}")
+        return accumulate
+
+    def __setup_scheduler(self):
+        if self.config["linear_lr"]:
+            lr_schedule_fn = linear(steps=self.config["epochs"], lrf=self.hyperparameters['lrf'])
+        else:
+            lr_schedule_fn = one_cycle(y1=1, y2=self.hyperparameters['lrf'],
+                                       steps=self.config["epochs"])  # cosine 1->hyp['lrf']
+        return torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lr_schedule_fn)
+
+    def __setup_optimizer_parameters(self):
+        pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
+        for module_name, module in self.model.named_modules():
+            if hasattr(module, 'bias') and isinstance(module.bias, nn.Parameter):
+                pg2.append(module.bias)  # biases
+            if isinstance(module, nn.BatchNorm2d):
+                pg0.append(module.weight)  # no decay
+            elif hasattr(module, 'weight') and isinstance(module.weight, nn.Parameter):
+                pg1.append(module.weight)  # apply decay
+            if hasattr(module, 'im'):
+                if hasattr(module.im, 'implicit'):
+                    pg0.append(module.im.implicit)
+                else:
+                    for iv in module.im:
+                        pg0.append(iv.implicit)
+            if hasattr(module, 'imc'):
+                if hasattr(module.imc, 'implicit'):
+                    pg0.append(module.imc.implicit)
+                else:
+                    for iv in module.imc:
+                        pg0.append(iv.implicit)
+            if hasattr(module, 'imb'):
+                if hasattr(module.imb, 'implicit'):
+                    pg0.append(module.imb.implicit)
+                else:
+                    for iv in module.imb:
+                        pg0.append(iv.implicit)
+            if hasattr(module, 'imo'):
+                if hasattr(module.imo, 'implicit'):
+                    pg0.append(module.imo.implicit)
+                else:
+                    for iv in module.imo:
+                        pg0.append(iv.implicit)
+            if hasattr(module, 'ia'):
+                if hasattr(module.ia, 'implicit'):
+                    pg0.append(module.ia.implicit)
+                else:
+                    for iv in module.ia:
+                        pg0.append(iv.implicit)
+            if hasattr(module, 'attn'):
+                if hasattr(module.attn, 'logit_scale'):
+                    pg0.append(module.attn.logit_scale)
+                if hasattr(module.attn, 'q_bias'):
+                    pg0.append(module.attn.q_bias)
+                if hasattr(module.attn, 'v_bias'):
+                    pg0.append(module.attn.v_bias)
+                if hasattr(module.attn, 'relative_position_bias_table'):
+                    pg0.append(module.attn.relative_position_bias_table)
+            if hasattr(module, 'rbr_dense'):
+                if hasattr(module.rbr_dense, 'weight_rbr_origin'):
+                    pg0.append(module.rbr_dense.weight_rbr_origin)
+                if hasattr(module.rbr_dense, 'weight_rbr_avg_conv'):
+                    pg0.append(module.rbr_dense.weight_rbr_avg_conv)
+                if hasattr(module.rbr_dense, 'weight_rbr_pfir_conv'):
+                    pg0.append(module.rbr_dense.weight_rbr_pfir_conv)
+                if hasattr(module.rbr_dense, 'weight_rbr_1x1_kxk_idconv1'):
+                    pg0.append(module.rbr_dense.weight_rbr_1x1_kxk_idconv1)
+                if hasattr(module.rbr_dense, 'weight_rbr_1x1_kxk_conv2'):
+                    pg0.append(module.rbr_dense.weight_rbr_1x1_kxk_conv2)
+                if hasattr(module.rbr_dense, 'weight_rbr_gconv_dw'):
+                    pg0.append(module.rbr_dense.weight_rbr_gconv_dw)
+                if hasattr(module.rbr_dense, 'weight_rbr_gconv_pw'):
+                    pg0.append(module.rbr_dense.weight_rbr_gconv_pw)
+                if hasattr(module.rbr_dense, 'vector'):
+                    pg0.append(module.rbr_dense.vector)
+        if self.config["adam"]:
+            optimizer = torch.optim.Adam(pg0, lr=self.hyperparameters['lr0'],
+                                         betas=(self.hyperparameters['momentum'], 0.999))  # adjust beta1 to momentum
+        else:
+            optimizer = torch.optim.SGD(pg0, lr=self.hyperparameters['lr0'], momentum=self.hyperparameters['momentum'],
+                                        nesterov=True)
+
+        optimizer.add_param_group(
+            {'params': pg1, 'weight_decay': self.hyperparameters['weight_decay']})  # add pg1 with weight_decay
+        optimizer.add_param_group({'params': pg2})  # add pg2 (biases)
+        self.logger.info(f'Optimizer groups: {len(pg2):g} .bias, {len(pg1):g} conv.weight, {len(pg0):g} other')
+        # del pg0, pg1, pg2
+        return optimizer
 
     def train(self):
         # --- Directories, initialize where to save things ---
         save_dir, weights_dir, last_ckpt, best_ckpt, results_file = self.__init_dump_folder()
 
-        self.device = get_device(self.config["device"])
         # --- Model ---
         pretrained: bool = self.config["weights"].endswith('.pt')
-        self.__setup_model(pretrained=pretrained, class_number=self.config["class_number"])
+        self.__setup_model(pretrained=pretrained)
+
+        # --- Gradient accumulation ---
+        accumulate = self.__setup_gradient_accumulation()
+
+        self.optimizer = self.__setup_optimizer_parameters()
+        self.scheduler = self.__setup_scheduler()
 
         pass
         # """
