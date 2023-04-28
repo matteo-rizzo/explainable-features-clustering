@@ -24,7 +24,7 @@ def parse_model(layout: dict, logger):
     input_channels: list[int] = [layout['class_number']]
 
     layers, save, output_channel = [], [], input_channels[-1]  # layers, savelist, ch out
-    for idx, (fr, num, module, params) in enumerate(layout['backbone'] + layout['head']):  # from, number, module, args
+    for idx, (fr, num, module, params) in enumerate(layout['backbone'] + layout['head']):
         # Evaluate the module if read as string, else pass directly (e.g. "Conv" -> Conv module)
         module = eval(module) if isinstance(module, str) else module
         # Evaluate parameters if read as strings, else pass them directly (e.g. "1" -> 1)
@@ -32,36 +32,10 @@ def parse_model(layout: dict, logger):
 
         if module in [nn.Conv2d, Conv, nn.MaxPool2d, nn.Linear]:
             in_channel, output_channel = input_channels[fr], params[0]
-            # if c2 != class_number:  # if not output
-            #     c2 = make_divisible(c2 * width_multiplier, 8)
-
-            # params = [in_channel, output_channel, *params[1:]]
-            # a = 0
-            # if module in []:
-            #     params.insert(2, num)  # number of repeats
-            #     num = 1
         elif module is nn.BatchNorm2d:
             params = [input_channels[fr]]
-        elif module is nn.ReLU:
+        elif module in [nn.ReLU, nn.Flatten]:
             params = []
-        # elif m is Concat:
-        #     c2 = sum([ch[x] for x in f])
-        # elif m is Chuncat:
-        #     c2 = sum([ch[x] for x in f])
-        # elif m is Shortcut:
-        #     c2 = ch[f[0]]
-        # elif m is Foldcut:
-        #     c2 = ch[f] // 2
-        # elif m in [Detect, IDetect, IAuxDetect, IBin, IKeypoint]:
-        #     args.append([ch[x] for x in f])
-        #     if isinstance(args[1], int):  # number of anchors
-        #         args[1] = [list(range(args[1] * 2))] * len(f)
-        # elif m is ReOrg:
-        #     c2 = ch[f] * 4
-        # elif m is Contract:
-        #     c2 = ch[f] * args[0] ** 2
-        # elif m is Expand:
-        #     c2 = ch[f] // args[0] ** 2
         else:
             output_channel = input_channels[fr]
 
@@ -70,9 +44,8 @@ def parse_model(layout: dict, logger):
         np = sum([x.numel() for x in m_.parameters()])  # number params
         m_.i, m_.f, m_.type, m_.np = idx, fr, module_type, np  # attach index, 'from' index, type, number params
         logger.info(f'{idx:>3}{fr:>18}{num:>3}{np:10.0f}  {module_type:<40}{params}')  # print
-        save.extend(x % idx for x in ([fr] if isinstance(fr, int) else fr) if x != -1)  # append to savelist
         layers.append(m_)
         if idx == 0:
             input_channels = []
         input_channels.append(output_channel)
-    return nn.Sequential(*layers), sorted(save)
+    return nn.Sequential(*layers)
