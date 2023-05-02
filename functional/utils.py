@@ -1,7 +1,7 @@
 import glob
 import os
 from pathlib import Path
-from typing import re
+import re
 
 
 def intersect_dicts(dict_a: dict, dict_b: dict, exclude=()):
@@ -35,10 +35,10 @@ def increment_path(path: str, exist_ok: bool = True, sep: str = ''):
     # Otherwise give incremental name
     else:
         dirs = glob.glob(f"{path}{sep}*")  # similar paths
-        matches = [re.search(rf"%s{sep}(\d+)" % path.stem, d) for d in dirs]
+        matches = [re.search(rf"%s{sep}_(\d+)" % path.stem, d) for d in dirs]
         i = [int(m.groups()[0]) for m in matches if m]  # indices
         n = max(i) + 1 if i else 2  # increment number
-        return f"{path}{sep}{n}"  # update path
+        return f"{path}{sep}_{n}"  # update path
 
 
 def check_file_exists(file: str) -> str:

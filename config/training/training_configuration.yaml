@@ -22,7 +22,7 @@ architecture_config: "config/architectures/importance_weighted_cnn.yaml"
 weights: "" # Initial weights path
 hyperparameters: "config/training/hypeparameter_configuration.yaml"  # Hyperparameters path
 project: "dumps/train" # save to project/name
-name: "yolov7" # save to project/name
+name: "efc" # save to project/name
 exist_ok: False # existing project/name ok, do not increment
 
 # TODO: ---
