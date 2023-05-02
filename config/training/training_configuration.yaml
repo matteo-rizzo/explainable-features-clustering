@@ -6,7 +6,7 @@ nominal_batch_size: 64
 img_size: # [train, test] image sizes
   - 640   # train
   - 640   # test
-epochs: 300 # Number of training epochs
+epochs: 100 # Number of training epochs
 
 adam: False # use torch.optim.Adam() optimizer (otherwise SGD)
 linear_lr: False # linear learning rate (decay)

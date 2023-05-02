@@ -5,7 +5,6 @@ from typing import Optional
 
 import colorlog
 import torch
-import torch.nn as nn
 import yaml
 from torch.cuda import amp
 from torch.utils.data import Dataset
@@ -13,10 +12,9 @@ from torch.utils.data import Dataset
 from classes.deep_learning.architectures.CNN import CNN
 from classes.deep_learning.architectures.TorchModel import TorchModel
 from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
-from functional.data_utils import check_img_size
 from functional.lr_schedulers import linear_lrs, one_cycle_lrs
 from functional.setup import get_device
-from functional.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run
+from functional.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run, colorstr
 
 
 # from classifiers.deep_learning.classes.core.Evaluator import Evaluator
@@ -32,8 +30,9 @@ class Trainer:
         self.logger = logger
         # --- Training stuff ---
         self.optimizer = None
-        self.scaler = None
-        self.emheduler = None
+        self.gradient_scaler = None
+        self.exponential_moving_average = None
+        self.scheduler = None
         self.sca = None  # Exponential Moving Average
         # ---
         # self.compute_loss_ota = None
@@ -126,7 +125,7 @@ class Trainer:
         self.scheduler: torch.optim.lr_scheduler = self.__setup_scheduler()
 
         # --- Exponential moving average ---
-        self.ema = ExponentialMovingAverageModel(self.model)
+        self.exponential_moving_average = ExponentialMovingAverageModel(self.model)
 
         # --- Resume pretrained if necessary ---
         if pretrained:
@@ -135,53 +134,28 @@ class Trainer:
         else:
             start_epoch, best_fitness = 0, 0.0
 
-        grid_size = max(int(self.model.stride.max()), 32)  # grid size (max stride)
-        # detection_layer_number = self.model.model[-1].nl  # number of detection layers (used for scaling hyp['obj'])
-        # Verify imgsz are grid_size-multiples
-        img_size, img_size_test = [check_img_size(x, grid_size, logger=self.logger) for x in self.config["img_size"]]
+        # Grid size (max stride)
+        # grid_size = max(int(self.model.stride.max()), 32)
+        # Verify img_size are grid_size-multiples
+        # img_size, img_size_test = [check_img_size(x, grid_size, logger=self.logger) for x in self.config["img_size"]]
 
-        # self.hyperparameters['label_smoothing'] = self.config["label_smoothing"]
-
+        batch_number: int = len(train_dataloader)
         # Number of warmup iterations, max(3 epochs, 1k iterations)
-        warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * nb), 1000)
-        # nw = min(nw, (epochs - start_epoch) / 2 * nb)  # limit warmup to < 1/2 of training
-        # maps = np.zeros(nc)  # mAP per class
+        warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)
+
         results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
         self.scheduler.last_epoch = start_epoch - 1  # do not move
-        self.scaler = amp.GradScaler(enabled=self.device == "cuda:0")
+        self.gradient_scaler = amp.GradScaler(enabled=self.device == "cuda:0")
         # self.compute_loss_ota = ComputeLossOTA(self.model)  # init losses class
         # self.compute_loss = ComputeLoss(self.model)  # init losses class
-        # self.logger.info(f'{colorstr("bright_green", "Image sizes")}: {imgsz} train, {imgsz_test} test\t'
-        #                  f'{colorstr("bright_green", "Dataloader workers")}: {dataloader.num_workers}\t'
-        #                  f'{colorstr("bright_green", "Saving results to")}: {save_dir}\n'
-        #                  f'    {colorstr("bright_green", "Starting training for")} {self.configuration.epochs} epochs...')
-        # self.model.names = names
-        # """
-        # Trains the model according to the established parameters and the given data
-        # :param data: a dictionary of data loaders containing train, val and test data
-        # :return: the evaluation metrics of the training and the trained model
-        # """
-        # print("\n Training the model...")
-        #
-        # self.model.print_model_overview()
-        #
-        # evaluations = []
-        # training_loader = data["train"]
-        #
-        # # --- Single epoch ---
-        # for epoch in range(self.__epochs):
-        #     # Train epoch
-        #     self.train_one_epoch(epoch, training_loader)
-        #
-        #     # Perform evaluation
-        #     if not (epoch + 1) % self.__evaluate_every:
-        #         evaluations += [self.evaluator.evaluate(data, self.model)]
-        #         if self.__early_stopping_check(evaluations[-1]["metrics"]["val"][self.__es_metric]):
-        #             break
-        #
-        # print("\n Finished training!")
-        # print("----------------------------------------------------------------")
-        # return self.model, evaluations
+        self.logger.info(f'{colorstr("bright_green", "Image sizes")}: TRAIN [{self.config["img_size"][0]}] , '
+                         f'TEST [{self.config["img_size"][1]}]\t'
+                         f'{colorstr("bright_green", "Dataloader workers")}: {train_dataloader.num_workers}\t'
+                         f'{colorstr("bright_green", "Saving results to")}: {save_dir}\n'
+                         f'{" "*31}{colorstr("bright_green", "Starting training for")} {self.config["epochs"]} epochs...')
+
+        torch.save(self.model, weights_dir / 'init.pt')
+        epoch: int = -1
 
     def __start_or_resume_config(self):
         # --- Resume if a training had already started ---
@@ -253,6 +227,7 @@ class Trainer:
         return accumulate
 
     def __setup_scheduler(self) -> torch.optim.lr_scheduler:
+        # TODO: replace with scheduler factory
         if self.config["linear_lr"]:
             lr_schedule_fn = linear_lrs(steps=self.config["epochs"],
                                         lrf=self.hyperparameters['lrf'])
@@ -262,7 +237,7 @@ class Trainer:
         return torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lr_schedule_fn)
 
     def __setup_optimizer(self) -> torch.optim.Optimizer:
-
+        # TODO: replace with optimizer factory
         if self.config["adam"]:
             optimizer = torch.optim.Adam(self.model.parameters(), lr=self.hyperparameters['lr0'],
                                          betas=(self.hyperparameters['momentum'], 0.999))  # adjust beta1 to momentum
@@ -270,77 +245,7 @@ class Trainer:
             optimizer = torch.optim.SGD(self.model.parameters(), lr=self.hyperparameters['lr0'],
                                         momentum=self.hyperparameters['momentum'],
                                         nesterov=True)
-        # TODO: experimental different optimization for different parameter groups
-        # pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
-        # for module_name, module in self.model.named_modules():
-        #     if hasattr(module, 'bias') and isinstance(module.bias, nn.Parameter):
-        #         pg2.append(module.bias)  # biases
-        #     if isinstance(module, nn.BatchNorm2d):
-        #         pg0.append(module.weight)  # no decay
-        #     elif hasattr(module, 'weight') and isinstance(module.weight, nn.Parameter):
-        #         pg1.append(module.weight)  # apply decay
-        #     if hasattr(module, 'im'):
-        #         if hasattr(module.im, 'implicit'):
-        #             pg0.append(module.im.implicit)
-        #         else:
-        #             for iv in module.im:
-        #                 pg0.append(iv.implicit)
-        #     if hasattr(module, 'imc'):
-        #         if hasattr(module.imc, 'implicit'):
-        #             pg0.append(module.imc.implicit)
-        #         else:
-        #             for iv in module.imc:
-        #                 pg0.append(iv.implicit)
-        #     if hasattr(module, 'imb'):
-        #         if hasattr(module.imb, 'implicit'):
-        #             pg0.append(module.imb.implicit)
-        #         else:
-        #             for iv in module.imb:
-        #                 pg0.append(iv.implicit)
-        #     if hasattr(module, 'imo'):
-        #         if hasattr(module.imo, 'implicit'):
-        #             pg0.append(module.imo.implicit)
-        #         else:
-        #             for iv in module.imo:
-        #                 pg0.append(iv.implicit)
-        #     if hasattr(module, 'ia'):
-        #         if hasattr(module.ia, 'implicit'):
-        #             pg0.append(module.ia.implicit)
-        #         else:
-        #             for iv in module.ia:
-        #                 pg0.append(iv.implicit)
-        #     if hasattr(module, 'attn'):
-        #         if hasattr(module.attn, 'logit_scale'):
-        #             pg0.append(module.attn.logit_scale)
-        #         if hasattr(module.attn, 'q_bias'):
-        #             pg0.append(module.attn.q_bias)
-        #         if hasattr(module.attn, 'v_bias'):
-        #             pg0.append(module.attn.v_bias)
-        #         if hasattr(module.attn, 'relative_position_bias_table'):
-        #             pg0.append(module.attn.relative_position_bias_table)
-        #     if hasattr(module, 'rbr_dense'):
-        #         if hasattr(module.rbr_dense, 'weight_rbr_origin'):
-        #             pg0.append(module.rbr_dense.weight_rbr_origin)
-        #         if hasattr(module.rbr_dense, 'weight_rbr_avg_conv'):
-        #             pg0.append(module.rbr_dense.weight_rbr_avg_conv)
-        #         if hasattr(module.rbr_dense, 'weight_rbr_pfir_conv'):
-        #             pg0.append(module.rbr_dense.weight_rbr_pfir_conv)
-        #         if hasattr(module.rbr_dense, 'weight_rbr_1x1_kxk_idconv1'):
-        #             pg0.append(module.rbr_dense.weight_rbr_1x1_kxk_idconv1)
-        #         if hasattr(module.rbr_dense, 'weight_rbr_1x1_kxk_conv2'):
-        #             pg0.append(module.rbr_dense.weight_rbr_1x1_kxk_conv2)
-        #         if hasattr(module.rbr_dense, 'weight_rbr_gconv_dw'):
-        #             pg0.append(module.rbr_dense.weight_rbr_gconv_dw)
-        #         if hasattr(module.rbr_dense, 'weight_rbr_gconv_pw'):
-        #             pg0.append(module.rbr_dense.weight_rbr_gconv_pw)
-        #         if hasattr(module.rbr_dense, 'vector'):
-        #             pg0.append(module.rbr_dense.vector)
-
-        # optimizer.add_param_group(
-        #     {'params': pg1, 'weight_decay': self.hyperparameters['weight_decay']})  # add pg1 with weight_decay
-        # optimizer.add_param_group({'params': pg2})  # add pg2 (biases)
-        # self.logger.info(f'Optimizer groups: {len(pg2):g} .bias, {len(pg1):g} conv.weight, {len(pg0):g} other')
-        # del pg0, pg1, pg2
+        # TODO: look up different optimization for different parameter groups
         return optimizer
 
     def __resume_pretrained(self, results_file) -> [int, float]:
@@ -351,9 +256,9 @@ class Trainer:
             best_fitness = self.checkpoint['best_fitness']
 
         # --- EMA ---
-        if self.ema and self.checkpoint.get('ema'):
-            self.ema.ema.load_state_dict(self.checkpoint['ema'].float().state_dict())
-            self.ema.updates = self.checkpoint['updates']
+        if self.exponential_moving_average and self.checkpoint.get('ema'):
+            self.exponential_moving_average.ema_model.load_state_dict(self.checkpoint['ema'].float().state_dict())
+            self.exponential_moving_average.updates = self.checkpoint['updates']
 
         # --- Results ---
         if self.checkpoint.get('training_results') is not None:
@@ -371,43 +276,46 @@ class Trainer:
             self.config["epochs"] += self.checkpoint['epoch']  # finetune additional epoch
         return start_epoch, best_fitness
 
-    def __early_stopping_check(self, metric_value: float) -> bool:
-        pass
-        # """
-        # Decides whether to early stop the train based on the early stopping conditions
-        # @param metric_value: the monitored val metrics (e.g. auc, loss)
-        # @return: a flag indicating whether the training should be early stopped
-        # """
-        # if self.__es_metric_trend == "increasing":
-        #     metrics_check = metric_value > self.__es_metric_best_value
-        # else:
-        #     metrics_check = metric_value < self.__es_metric_best_value
-        #
-        # if metrics_check:
-        #     print(f"\n\t Old best val {self.__es_metric}: {self.__es_metric_best_value:.4f} "
-        #           f"| New best {self.__es_metric}: {metric_value:.4f}\n")
-        #
-        #     print("\t Saving new best model...")
-        #     self.model.save(self.__path_to_best_model)
-        #     print("\t -> New best model saved!")
-        #
-        #     self.__es_metric_best_value = metric_value
-        #     self.__epochs_no_improvement = 0
-        # else:
-        #     self.__epochs_no_improvement += 1
-        #     if self.__epochs_no_improvement == self.__patience:
-        #         print(f" ** No decrease in val {self.__es_metric} "
-        #               f"for {self.__patience} evaluations. Early stopping! ** ")
-        #         return True
-        #
-        # print(" Epochs without improvement: ", self.__epochs_no_improvement)
-        # print(" ........................................................... ")
-        # return False
+    # def __early_stopping_check(self, metric_value: float) -> bool:
+    #     pass
+    #     # """
+    #     # Decides whether to early stop the train based on the early stopping conditions
+    #     # @param metric_value: the monitored val metrics (e.g. auc, loss)
+    #     # @return: a flag indicating whether the training should be early stopped
+    #     # """
+    #     # if self.__es_metric_trend == "increasing":
+    #     #     metrics_check = metric_value > self.__es_metric_best_value
+    #     # else:
+    #     #     metrics_check = metric_value < self.__es_metric_best_value
+    #     #
+    #     # if metrics_check:
+    #     #     print(f"\n\t Old best val {self.__es_metric}: {self.__es_metric_best_value:.4f} "
+    #     #           f"| New best {self.__es_metric}: {metric_value:.4f}\n")
+    #     #
+    #     #     print("\t Saving new best model...")
+    #     #     self.model.save(self.__path_to_best_model)
+    #     #     print("\t -> New best model saved!")
+    #     #
+    #     #     self.__es_metric_best_value = metric_value
+    #     #     self.__epochs_no_improvement = 0
+    #     # else:
+    #     #     self.__epochs_no_improvement += 1
+    #     #     if self.__epochs_no_improvement == self.__patience:
+    #     #         print(f" ** No decrease in val {self.__es_metric} "
+    #     #               f"for {self.__patience} evaluations. Early stopping! ** ")
+    #     #         return True
+    #     #
+    #     # print(" Epochs without improvement: ", self.__epochs_no_improvement)
+    #     # print(" ........................................................... ")
+    #     # return False
 
 
 class DummyDataset(Dataset):
     def __getitem__(self, index):
         return torch.zeros(3, 224, 224), torch.zeros(1, dtype=torch.long)
+
+    def __len__(self):
+        return 1
 
 
 def main():
@@ -427,7 +335,7 @@ def main():
     with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
         hyp = yaml.safe_load(f)
 
-    train, val = DummyDataset(), DummyDataset()
+    train, val = torch.utils.data.DataLoader(DummyDataset()), torch.utils.data.DataLoader(DummyDataset())
     trainer = Trainer(CNN, config=config, hyperparameters=hyp, logger=logger)
     trainer.train(train, val)
 

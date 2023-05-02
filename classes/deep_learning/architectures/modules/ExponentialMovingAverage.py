@@ -22,12 +22,12 @@ class ExponentialMovingAverageModel:
 
     def __init__(self, model, decay=0.9999, updates=0):
         # Create EMA
-        self.ema = deepcopy(model).eval()  # FP32 EMA
+        self.ema_model = deepcopy(model).eval()  # FP32 EMA
         # if next(model.parameters()).device.type != 'cpu':
         #     self.ema.half()  # FP16 EMA
         self.updates = updates  # number of EMA updates
         self.decay = lambda x: decay * (1 - math.exp(-x / 2000))  # decay exponential ramp (to help early epochs)
-        for p in self.ema.parameters():
+        for p in self.ema_model.parameters():
             p.requires_grad_(False)
 
     def update(self, model):
@@ -37,11 +37,11 @@ class ExponentialMovingAverageModel:
             d = self.decay(self.updates)
 
             msd = model.state_dict()  # model state_dict
-            for k, v in self.ema.state_dict().items():
+            for k, v in self.ema_model.state_dict().items():
                 if v.dtype.is_floating_point:
                     v *= d
                     v += (1. - d) * msd[k].detach()
 
     def update_attr(self, model, include=(), exclude=('process_group', 'reducer')):
         # Update EMA attributes
-        copy_attr(self.ema, model, include, exclude)
+        copy_attr(self.ema_model, model, include, exclude)
