@@ -2,7 +2,7 @@ import math
 
 import torch.nn as nn
 
-from classes.deep_learning.modules.common import Conv
+from classes.deep_learning.architectures.modules.common import Conv
 
 
 def make_divisible(x, divisor):

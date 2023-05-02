@@ -12,6 +12,7 @@ class TorchModel(nn.Module):
         with open(config_path, "r") as f:
             cfg = yaml.safe_load(f)
         self.model = parse_model(cfg, logger=logger)
+        logger.info(f'{"-"*95}')
 
     def forward(self, x):
         y, dt = [], []  # outputs
