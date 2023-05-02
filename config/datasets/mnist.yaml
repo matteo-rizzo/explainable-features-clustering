@@ -1,0 +1,7 @@
+# Folders
+folder: "dataset/mnist"
+#train: 'data/sample_yolo/images/train'
+#val: 'data/sample_yolo/images/train'
+
+# Number of classes
+nc: 10

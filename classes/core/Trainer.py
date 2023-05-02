@@ -1,14 +1,22 @@
+import logging
+import os
 from pathlib import Path
 from typing import Optional
 
+import colorlog
 import torch
 import torch.nn as nn
 import yaml
+from torch.cuda import amp
+from torch.utils.data import Dataset
 
+from classes.deep_learning.architectures.CNN import CNN
 from classes.deep_learning.architectures.TorchModel import TorchModel
-from functional.lr_schedulers import linear, one_cycle
+from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
+from functional.data_utils import check_img_size
+from functional.lr_schedulers import linear_lrs, one_cycle_lrs
 from functional.setup import get_device
-from functional.utils import intersect_dicts
+from functional.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run
 
 
 # from classifiers.deep_learning.classes.core.Evaluator import Evaluator
@@ -100,7 +108,110 @@ class Trainer:
         # tqdm_bar.close()
         # print(" ...........................................................")
 
-    def __init_dump_folder(self):
+    def train(self, train_dataloader, val_dataloader):
+        # --- Directories, initialize where to save things ---
+        self.__start_or_resume_config()
+        save_dir, weights_dir, last_ckpt, best_ckpt, results_file = self.__init_dump_folder()
+
+        # --- Model ---
+        pretrained: bool = self.config["weights"].endswith('.pt')
+        self.__setup_model(pretrained=pretrained)
+
+        # --- Gradient accumulation ---
+        accumulate: int = self.__setup_gradient_accumulation()
+
+        # --- Optimization ---
+        # TODO: make optional / modularize
+        self.optimizer: torch.optim.Optimizer = self.__setup_optimizer_parameters()
+        self.scheduler: torch.optim.lr_scheduler = self.__setup_scheduler()
+
+        # --- Exponential moving average ---
+        self.ema = ExponentialMovingAverageModel(self.model)
+
+        # --- Resume pretrained if necessary ---
+        if pretrained:
+            start_epoch, best_fitness = self.__resume_pretrained(results_file=results_file)
+            self.checkpoint = None
+        else:
+            start_epoch, best_fitness = 0, 0.0
+
+        grid_size = max(int(self.model.stride.max()), 32)  # grid size (max stride)
+        # detection_layer_number = self.model.model[-1].nl  # number of detection layers (used for scaling hyp['obj'])
+        # Verify imgsz are grid_size-multiples
+        img_size, img_size_test = [check_img_size(x, grid_size, logger=self.logger) for x in self.config["img_size"]]
+
+        # self.hyperparameters['label_smoothing'] = self.config["label_smoothing"]
+
+        # Number of warmup iterations, max(3 epochs, 1k iterations)
+        warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * nb), 1000)
+        # nw = min(nw, (epochs - start_epoch) / 2 * nb)  # limit warmup to < 1/2 of training
+        # maps = np.zeros(nc)  # mAP per class
+        results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
+        self.scheduler.last_epoch = start_epoch - 1  # do not move
+        self.scaler = amp.GradScaler(enabled=self.device == "cuda:0")
+        # self.compute_loss_ota = ComputeLossOTA(self.model)  # init losses class
+        # self.compute_loss = ComputeLoss(self.model)  # init losses class
+        # self.logger.info(f'{colorstr("bright_green", "Image sizes")}: {imgsz} train, {imgsz_test} test\t'
+        #                  f'{colorstr("bright_green", "Dataloader workers")}: {dataloader.num_workers}\t'
+        #                  f'{colorstr("bright_green", "Saving results to")}: {save_dir}\n'
+        #                  f'    {colorstr("bright_green", "Starting training for")} {self.configuration.epochs} epochs...')
+        # self.model.names = names
+        # """
+        # Trains the model according to the established parameters and the given data
+        # :param data: a dictionary of data loaders containing train, val and test data
+        # :return: the evaluation metrics of the training and the trained model
+        # """
+        # print("\n Training the model...")
+        #
+        # self.model.print_model_overview()
+        #
+        # evaluations = []
+        # training_loader = data["train"]
+        #
+        # # --- Single epoch ---
+        # for epoch in range(self.__epochs):
+        #     # Train epoch
+        #     self.train_one_epoch(epoch, training_loader)
+        #
+        #     # Perform evaluation
+        #     if not (epoch + 1) % self.__evaluate_every:
+        #         evaluations += [self.evaluator.evaluate(data, self.model)]
+        #         if self.__early_stopping_check(evaluations[-1]["metrics"]["val"][self.__es_metric]):
+        #             break
+        #
+        # print("\n Finished training!")
+        # print("----------------------------------------------------------------")
+        # return self.model, evaluations
+
+    def __start_or_resume_config(self):
+        # --- Resume if a training had already started ---
+        if self.config["resume"]:
+            # Specified or most recent path
+            checkpoint = self.config["resume"] if isinstance(self.config["resume"], str) else get_latest_run()
+            assert os.path.isfile(checkpoint), 'ERROR: checkpoint does not exist'
+            # Open the parameters of the resumed configuration
+            with open(Path(checkpoint).parent.parent / 'opt.yaml') as f:
+                self.config = yaml.safe_load(f)
+            # Re-configure from loaded configuration
+            self.config["architecture_config"] = ''
+            self.config["weights"] = checkpoint
+            self.config["resume"] = True
+            self.logger.info(f'Resuming training from {checkpoint}')
+
+        else:
+            # Check files exist. The return is either the same path (if it was correct)
+            # Or an updated path if it was found (uniquely) in the path's subdirectories
+            self.config["data"] = check_file_exists(self.config["data"])
+            self.config["architecture_config"] = check_file_exists(self.config["architecture_config"])
+            self.config["hyperparameters"] = check_file_exists(self.config["hyperparameters"])
+            assert len(self.config["architecture_config"]) or len(self.config["weights"]), \
+                'either architecture_config or weights must be specified'
+            # Increment run
+            self.config["save_dir"] = increment_path(Path(self.config["project"]) / self.config["name"],
+                                                     exist_ok=self.config["exist_ok"])
+            self.logger.info(f'Starting a new training')
+
+    def __init_dump_folder(self) -> [Path, Path, Path, Path, Path]:
         save_dir: Path = Path(self.config["save_dir"])
         weights_dir: Path = save_dir / 'weights'
         weights_dir.mkdir(parents=True, exist_ok=True)  # make dir
@@ -115,11 +226,12 @@ class Trainer:
             yaml.dump(vars(self.config), f, sort_keys=False)
         return save_dir, weights_dir, last_ckpt, best_ckpt, results_file
 
-    def __setup_model(self, pretrained: bool):
+    def __setup_model(self, pretrained: bool) -> None:
         if pretrained:
             self.checkpoint = torch.load(self.config["weights"], map_location=self.device)  # load checkpoint
-            self.model = self.model_class(config_path=self.config["cfg"] or self.checkpoint['model'].yaml,
-                                          logger=self.logger).to(self.device)
+            self.model = self.model_class(
+                config_path=self.config["architecture_config"] or self.checkpoint['model'].yaml,
+                logger=self.logger).to(self.device)
             state_dict = self.checkpoint['model'].float().state_dict()  # to FP32
             state_dict = intersect_dicts(state_dict, self.model.state_dict(), exclude=[])  # intersect
             self.model.load_state_dict(state_dict, strict=False)  # load
@@ -127,9 +239,10 @@ class Trainer:
                 f'Transferred {len(state_dict):g}/{len(self.model.state_dict()):g} '
                 f'items from {self.config["weights"]}')  # report
         else:
-            self.model = self.model_class(config_path=self.config["cfg"], logger=self.logger).to(self.device)
+            self.model = self.model_class(config_path=self.config["architecture_config"], logger=self.logger).to(
+                self.device)
 
-    def __setup_gradient_accumulation(self):
+    def __setup_gradient_accumulation(self) -> int:
         # If the total batch size is less than or equal to the nominal batch size, then accumulate is set to 1.
         # Accumulate losses before optimizing
         accumulate = max(round(self.config["nominal_batch_size"] / self.config["batch_size"]), 1)
@@ -139,15 +252,16 @@ class Trainer:
         self.logger.info(f"Scaled weight_decay = {self.hyperparameters['weight_decay']}")
         return accumulate
 
-    def __setup_scheduler(self):
+    def __setup_scheduler(self) -> torch.optim.lr_scheduler:
         if self.config["linear_lr"]:
-            lr_schedule_fn = linear(steps=self.config["epochs"], lrf=self.hyperparameters['lrf'])
+            lr_schedule_fn = linear_lrs(steps=self.config["epochs"],
+                                        lrf=self.hyperparameters['lrf'])
         else:
-            lr_schedule_fn = one_cycle(y1=1, y2=self.hyperparameters['lrf'],
-                                       steps=self.config["epochs"])  # cosine 1->hyp['lrf']
+            lr_schedule_fn = one_cycle_lrs(y1=1, y2=self.hyperparameters['lrf'],
+                                           steps=self.config["epochs"])  # cosine 1->hyp['lrf']
         return torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lr_schedule_fn)
 
-    def __setup_optimizer_parameters(self):
+    def __setup_optimizer_parameters(self) -> torch.optim.Optimizer:
         pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
         for module_name, module in self.model.named_modules():
             if hasattr(module, 'bias') and isinstance(module.bias, nn.Parameter):
@@ -226,47 +340,33 @@ class Trainer:
         # del pg0, pg1, pg2
         return optimizer
 
-    def train(self):
-        # --- Directories, initialize where to save things ---
-        save_dir, weights_dir, last_ckpt, best_ckpt, results_file = self.__init_dump_folder()
+    def __resume_pretrained(self, results_file) -> [int, float]:
+        # --- Optimizer ---
+        best_fitness: float = 0.0
+        if self.checkpoint['optimizer'] is not None:
+            self.optimizer.load_state_dict(self.checkpoint['optimizer'])
+            best_fitness = self.checkpoint['best_fitness']
 
-        # --- Model ---
-        pretrained: bool = self.config["weights"].endswith('.pt')
-        self.__setup_model(pretrained=pretrained)
+        # --- EMA ---
+        if self.ema and self.checkpoint.get('ema'):
+            self.ema.ema.load_state_dict(self.checkpoint['ema'].float().state_dict())
+            self.ema.updates = self.checkpoint['updates']
 
-        # --- Gradient accumulation ---
-        accumulate = self.__setup_gradient_accumulation()
+        # --- Results ---
+        if self.checkpoint.get('training_results') is not None:
+            results_file.write_text(self.checkpoint['training_results'])  # write results.txt
 
-        self.optimizer = self.__setup_optimizer_parameters()
-        self.scheduler = self.__setup_scheduler()
-
-        pass
-        # """
-        # Trains the model according to the established parameters and the given data
-        # :param data: a dictionary of data loaders containing train, val and test data
-        # :return: the evaluation metrics of the training and the trained model
-        # """
-        # print("\n Training the model...")
-        #
-        # self.model.print_model_overview()
-        #
-        # evaluations = []
-        # training_loader = data["train"]
-        #
-        # # --- Single epoch ---
-        # for epoch in range(self.__epochs):
-        #     # Train epoch
-        #     self.train_one_epoch(epoch, training_loader)
-        #
-        #     # Perform evaluation
-        #     if not (epoch + 1) % self.__evaluate_every:
-        #         evaluations += [self.evaluator.evaluate(data, self.model)]
-        #         if self.__early_stopping_check(evaluations[-1]["metrics"]["val"][self.__es_metric]):
-        #             break
-        #
-        # print("\n Finished training!")
-        # print("----------------------------------------------------------------")
-        # return self.model, evaluations
+        # --- Epochs ---
+        start_epoch = self.checkpoint['epoch'] + 1
+        if self.config["resume"]:
+            assert start_epoch > 0, f'{self.config["weights"]} training to ' \
+                                    f'{self.config["epochs"]:g} epochs is finished, nothing to resume.'
+        if self.config["epochs"] < start_epoch:
+            self.logger.info(
+                f'{self.config["weights"]} has been trained for {self.checkpoint["epoch"]:g} epochs. '
+                f'Fine-tuning for {self.config["epochs"]:g} additional epochs.')
+            self.config["epochs"] += self.checkpoint['epoch']  # finetune additional epoch
+        return start_epoch, best_fitness
 
     def __early_stopping_check(self, metric_value: float) -> bool:
         pass
@@ -300,3 +400,34 @@ class Trainer:
         # print(" Epochs without improvement: ", self.__epochs_no_improvement)
         # print(" ........................................................... ")
         # return False
+
+
+class DummyDataset(Dataset):
+    def __getitem__(self, index):
+        return torch.zeros(3, 224, 224), torch.zeros(1, dtype=torch.long)
+
+
+def main():
+    logger = logging.getLogger(__name__)
+    logger.setLevel("INFO")
+    ch = logging.StreamHandler()
+    ch.setLevel("INFO")
+    formatter = colorlog.ColoredFormatter(
+        "%(log_color)s[%(asctime)s] - %(levelname)s - %(white)s%(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    with open('config/training/training_configuration.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+    with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
+        hyp = yaml.safe_load(f)
+
+    train, val = DummyDataset(), DummyDataset()
+    trainer = Trainer(CNN(), config=config, hyperparameters=hyp, logger=logger)
+    trainer.train(train, val)
+
+
+if __name__ == "__main__":
+    main()

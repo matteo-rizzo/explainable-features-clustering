@@ -1097,3 +1097,5 @@ FodyWeavers.xsd
 
 # End of https://www.toptal.com/developers/gitignore/api/python,jetbrains,jetbrains+all,jetbrains+iml,pycharm,pycharm+all,pycharm+iml,macos,windows,linux,visualstudio,visualstudiocode,c++
 /dataset/
+/venv/
+/dumps/
