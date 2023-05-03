@@ -1,27 +1,39 @@
 import logging
 import os
+import time
+from copy import deepcopy
 from pathlib import Path
 from typing import Optional, Type
 
 import colorlog
+import numpy as np
 import torch
 import torch.nn as nn
 import yaml
 from torch.cuda import amp
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 from classes.deep_learning.architectures.CNN import CNN
 from classes.deep_learning.architectures.TorchModel import TorchModel
-from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
+# from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from classes.factories.OptimizerFactory import OptimizerFactory
 from functional.lr_schedulers import linear_lrs, one_cycle_lrs
 from functional.setup import get_device
+from functional.torch_utils import strip_optimizer
 from functional.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run, colorstr
 
 
 # from classifiers.deep_learning.classes.core.Evaluator import Evaluator
 # from classifiers.deep_learning.classes.factories.ModelFactory import ModelFactory
 # from classifiers.deep_learning.classes.utils.Params import Params
+
+def fitness(x):
+    # FIXME: to change
+    # IDEA: could change these weights
+    # Model fitness as a weighted combination of metrics
+    w = [0.0, 0.0, 0.1, 0.9]  # weights for [P, R, mAP@0.5, mAP@0.5:0.95]
+    return (x[:, :4] * w).sum(1)
 
 
 class Trainer:
@@ -33,9 +45,10 @@ class Trainer:
         # --- Training stuff ---
         self.optimizer = None
         self.gradient_scaler = None
-        self.exponential_moving_average = None
-        self.scheduler = None
-        self.sca = None  # Exponential Moving Average
+        # self.exponential_moving_average = None
+        self.lr_schedule_fn = None  # Scheduling function
+        self.scheduler = None  # Torch scheduler
+        self.accumulate: int = -1
         # ---
         # self.compute_loss_ota = None
         # self.compute_loss = None
@@ -73,8 +86,60 @@ class Trainer:
         #
         # self.evaluator = Evaluator(self.__device, config["num_classes"]
 
-    def train_one_epoch(self, epoch, training_loader):
-        pass
+    def train_one_epoch(self, train_dataloader: torch.utils.data.DataLoader, epoch: int):
+        # --- Enable training ---
+        self.model.train()
+        # --- Console logging ---
+        epoch_description: str = ""
+        batch_number: int = len(train_dataloader)
+        progress_bar = tqdm(enumerate(train_dataloader), total=batch_number)
+        # --- Zero gradient and train batch ---
+        self.optimizer.zero_grad()
+
+        # Number of warmup iterations, max(e.g. 3 epochs, 1k iterations)
+        warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)
+        for i, (imgs, targets, paths, _) in progress_bar:
+
+            imgs, n_integrated_batches = self.__warmup_batch(imgs, batch_number, epoch, i, warmup_number)
+            # --- Forward ---
+            with amp.autocast(enabled=self.device[:4] == "cuda:0"[:4]):
+                # --- Forward pass ---
+                pred = self.model(imgs)
+
+                if 'loss_ota' not in self.hyperparameters or self.hyperparameters['loss_ota'] == 1:
+                    loss, loss_items = self.compute_loss_ota(pred, targets.to(self.config["device"]),
+                                                             imgs)  # losses scaled by batch_size
+                else:
+                    # losses scaled by batch_size
+                    loss, loss_items = self.compute_loss(pred, targets.to(self.config["device"]))
+
+                # --- Backward ---
+                self.gradient_scaler.scale(loss).backward()
+
+                # --- Optimization ---
+                if n_integrated_batches % self.accumulate == 0:
+                    self.gradient_scaler.step(self.optimizer)  # optimizer.step
+                    self.gradient_scaler.update()
+                    self.optimizer.zero_grad()
+                    # if self.exponential_moving_average:
+                    #     self.exponential_moving_average.update(self.model)
+
+                # --- Console logging ---
+                mean_loss = (mean_loss * i + loss_items) / (i + 1)  # update mean losses
+                mem = '%.3gG' % (torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
+
+                s = (f"\t{colorstr('bold', 'magenta', 'Epoch')}: {epoch}/{self.config['epochs'] - 1}"
+                     f"\t{colorstr('bold', 'magenta', 'gpu_mem')}: {mem}"
+                     # f"\t{colorstr('bold', 'magenta', 'box')}: {box_loss:.4f}"
+                     # f"\t{colorstr('bold', 'magenta', 'obj')}: {obj_loss:.4f}"
+                     # f"\t{colorstr('bold', 'magenta', 'cls')}: {cls_loss:.4f}"
+                     f"\t{colorstr('bold', 'magenta', 'mean loss')}: {mean_loss:.4f}"
+                     f"\t{colorstr('bold', 'magenta', 'labels')}: {targets.shape[0]}"
+                     f"\t{colorstr('bold', 'magenta', 'img_size')}: {imgs.shape[-1]}"
+                     )
+                progress_bar.set_description(s)
+
+        return epoch_description
         # print(f"\n *** Epoch {epoch + 1}/{self.__epochs} *** ")
         #
         # self.model.train_mode()
@@ -109,6 +174,25 @@ class Trainer:
         # tqdm_bar.close()
         # print(" ...........................................................")
 
+    def __warmup_batch(self, imgs, batch_number: int, epoch: int, i: int, warmup_number: int):
+        n_integrated_batches: int = i + batch_number * epoch  # number integrated batches (since train start)
+        imgs = imgs.to(self.device, non_blocking=True).float() / 255.0  # uint8 to float32, 0-255 to 0.0-1.0
+        if n_integrated_batches <= warmup_number:
+            x_interpolated = [0, warmup_number]
+            self.accumulate = max(1, np.interp(n_integrated_batches, x_interpolated,
+                                               [1, self.config["nominal_batch_size"]
+                                                / self.config["batch_size"]]).round())
+            for j, x in enumerate(self.optimizer.param_groups):
+                # bias lr falls from 0.1 to lr0, all other lrs rise from 0.0 to lr0
+                x['lr'] = np.interp(n_integrated_batches, x_interpolated,
+                                    [self.hyperparameters['warmup_bias_lr'] if j == 2 else 0.0,
+                                     x['initial_lr'] * self.lr_schedule_fn(epoch)])
+                if 'momentum' in x:
+                    x['momentum'] = np.interp(n_integrated_batches, x_interpolated,
+                                              [self.hyperparameters['warmup_momentum'],
+                                               self.hyperparameters['momentum']])
+        return imgs, n_integrated_batches
+
     def train(self, train_dataloader, val_dataloader):
         # --- Directories, initialize where things are saved ---
         self.__start_or_resume_config()
@@ -119,7 +203,7 @@ class Trainer:
         self.__setup_model(pretrained=pretrained)
 
         # --- Gradient accumulation ---
-        accumulate: int = self.__setup_gradient_accumulation()
+        self.accumulate: int = self.__setup_gradient_accumulation()
 
         # --- Optimization ---
         # TODO: make optional / modularize
@@ -127,7 +211,7 @@ class Trainer:
         self.scheduler: torch.optim.lr_scheduler = self.__setup_scheduler()
 
         # --- Exponential moving average ---
-        self.exponential_moving_average = ExponentialMovingAverageModel(self.model)
+        # self.exponential_moving_average = ExponentialMovingAverageModel(self.model)
 
         # --- Resume pretrained if necessary ---
         if pretrained:
@@ -136,29 +220,58 @@ class Trainer:
         else:
             start_epoch, best_fitness = 0, 0.0
 
-        # Grid size (max stride)
-        # grid_size = max(int(self.model.stride.max()), 32)
-        # Verify img_size are grid_size-multiples
-        # img_size, img_size_test = [check_img_size(x, grid_size, logger=self.logger) for x in self.config["img_size"]]
-
-        batch_number: int = len(train_dataloader)
-        # Number of warmup iterations, max(e.g. 3 epochs, 1k iterations)
-        warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)
-
         # TODO: change
         results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
         self.scheduler.last_epoch = start_epoch - 1  # do not move
-        self.gradient_scaler = amp.GradScaler(enabled=self.device == "cuda:0")
+        self.gradient_scaler = amp.GradScaler(enabled=self.device[:4] == "cuda:0"[:4])
         # self.compute_loss_ota = ComputeLossOTA(self.model)  # init losses class
         # self.compute_loss = ComputeLoss(self.model)  # init losses class
         self.logger.info(f'{colorstr("bright_green", "Image sizes")}: TRAIN [{self.config["img_size"][0]}] , '
                          f'TEST [{self.config["img_size"][1]}]\t'
                          f'{colorstr("bright_green", "Dataloader workers")}: {train_dataloader.num_workers}\t'
                          f'{colorstr("bright_green", "Saving results to")}: {save_dir}\n'
-                         f'{" " * 31}{colorstr("bright_green", "Starting training for")} {self.config["epochs"]} epochs...')
+                         f'{" " * 31}{colorstr("bright_green", "Starting training for")} '
+                         f'{self.config["epochs"]} epochs...')
 
         torch.save(self.model, weights_dir / 'init.pt')
         epoch: int = -1
+        t0 = time.time()
+        # Start training ------------------------------------------------------------------------
+        for epoch in range(start_epoch, self.config["epochs"]):
+            # --- Forward, backward, optimization ---
+            s = self.train_one_epoch(train_dataloader=train_dataloader, epoch=epoch)
+
+            # --- Scheduler ---
+            self.scheduler.step()
+            # mAP
+            # self.exponential_moving_average.update_attr(self.model,
+            # include=['yaml', 'nc', 'hyp', 'gr', 'names', 'stride', 'class_weights'])
+            is_final_epoch: bool = epoch + 1 == self.config["epochs"]
+            # TODO: test?
+
+            # --- Write results ---
+            with open(results_file, 'a') as ckpt:
+                ckpt.write(s + '%10.4g' * 7 % results + '\n')  # append metrics, val_loss
+
+            # weighted combination of metrics
+            fitness_value = fitness(np.array(results).reshape(1, -1))
+            if fitness_value > best_fitness:
+                best_fitness = fitness_value
+
+            # Save model
+            if (not self.config["nosave"]) or is_final_epoch:
+                self.__save_model(best_fitness, epoch, fitness_value, best_ckpt, last_ckpt, results_file, weights_dir)
+                self.checkpoint = None
+        # End training --------------------------------------------------------------------------
+
+        self.logger.info(f'{epoch - start_epoch + 1:g} epochs completed in {(time.time() - t0) / 3600:.3f} hours.\n')
+
+        # --- Strip optimizers ---
+        for ckpt in last_ckpt, best_ckpt:
+            if ckpt.exists():
+                strip_optimizer(ckpt)
+        torch.cuda.empty_cache()
+        return results
 
     def __start_or_resume_config(self):
         # --- Resume if a training had already started ---
@@ -233,26 +346,17 @@ class Trainer:
 
     def __setup_scheduler(self) -> torch.optim.lr_scheduler:
         if self.config["linear_lr"]:
-            lr_schedule_fn = linear_lrs(steps=self.config["epochs"],
-                                        lrf=self.hyperparameters['lrf'])
+            self.lr_schedule_fn = linear_lrs(steps=self.config["epochs"],
+                                             lrf=self.hyperparameters['lrf'])
         else:
-            lr_schedule_fn = one_cycle_lrs(y1=1, y2=self.hyperparameters['lrf'],
-                                           steps=self.config["epochs"])  # cosine 1->hyp['lrf']
-        return torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lr_schedule_fn)
+            self.lr_schedule_fn = one_cycle_lrs(y1=1, y2=self.hyperparameters['lrf'],
+                                                steps=self.config["epochs"])  # cosine 1->hyp['lrf']
+        return torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=self.lr_schedule_fn)
 
     def __setup_optimizer(self) -> torch.optim.Optimizer:
         # TODO: look up different optimization for different parameter groups
         return OptimizerFactory(nn.ParameterList(self.model.parameters()),
                                 hyperparameters=self.hyperparameters).get(self.config["optimizer"])
-
-        # if self.config["adam"]:
-        #     optimizer = torch.optim.Adam(self.model.parameters(), lr=self.hyperparameters['lr0'],
-        #                                  betas=(self.hyperparameters['momentum'], 0.999))  # adjust beta1 to momentum
-        # else:
-        #     optimizer = torch.optim.SGD(self.model.parameters(), lr=self.hyperparameters['lr0'],
-        #                                 momentum=self.hyperparameters['momentum'],
-        #                                 nesterov=True)
-        # return optimizer
 
     def __resume_pretrained(self, results_file) -> [int, float]:
         # --- Optimizer ---
@@ -262,9 +366,9 @@ class Trainer:
             best_fitness = self.checkpoint['best_fitness']
 
         # --- EMA ---
-        if self.exponential_moving_average and self.checkpoint.get('ema'):
-            self.exponential_moving_average.ema_model.load_state_dict(self.checkpoint['ema'].float().state_dict())
-            self.exponential_moving_average.updates = self.checkpoint['updates']
+        # if self.exponential_moving_average and self.checkpoint.get('ema'):
+        #     self.exponential_moving_average.ema_model.load_state_dict(self.checkpoint['ema'].float().state_dict())
+        #     self.exponential_moving_average.updates = self.checkpoint['updates']
 
         # --- Results ---
         if self.checkpoint.get('training_results') is not None:
@@ -282,6 +386,31 @@ class Trainer:
                 f'Fine-tuning for {self.config["epochs"]:g} additional epochs.')
             self.config["epochs"] += self.checkpoint['epoch']  # finetune additional epoch
         return start_epoch, best_fitness
+
+    def __save_model(self, best_fitness: float, epoch: int, fitness_value: float,
+                     best_ckpt: Path, last_ckpt: Path, results_file: Path,
+                     weights_dir: Path):
+
+        checkpoint = {'epoch': epoch,
+                      'best_fitness': best_fitness,
+                      'training_results': results_file.read_text(),
+                      'model': deepcopy(self.model).half(),
+                      # 'ema': deepcopy(self.exponential_moving_average.ema_model).half(),
+                      # 'updates': self.exponential_moving_average.updates,
+                      'optimizer': self.optimizer.state_dict(),
+                      }
+        # Save last, best and delete
+        torch.save(checkpoint, last_ckpt)
+        if best_fitness == fitness_value:
+            torch.save(checkpoint, best_ckpt)
+        if (best_fitness == fitness_value) and (epoch >= 200):
+            torch.save(checkpoint, weights_dir / f'best_{epoch:03d}.pt')
+        if epoch == 0:
+            torch.save(checkpoint, weights_dir / f'epoch_{epoch:03d}.pt')
+        elif ((epoch + 1) % 25) == 0:
+            torch.save(checkpoint, weights_dir / f'epoch_{epoch:03d}.pt')
+        elif epoch >= (self.config["epochs"] - 5):
+            torch.save(checkpoint, weights_dir / f'epoch_{epoch:03d}.pt')
 
     # def __early_stopping_check(self, metric_value: float) -> bool:
     #     pass
