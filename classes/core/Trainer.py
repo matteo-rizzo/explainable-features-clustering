@@ -14,7 +14,9 @@ from torch.cuda import amp
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
+from classes.MNISTDataset import MNISTDataset
 from classes.deep_learning.architectures.CNN import CNN
+from classes.deep_learning.architectures.ImportanceWeightedCNN import ImportanceWeightedCNN
 from classes.deep_learning.architectures.TorchModel import TorchModel
 from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
@@ -49,7 +51,7 @@ class Trainer:
         # self.exponential_moving_average = None
         self.lr_schedule_fn = None  # Scheduling function
         self.scheduler = None  # Torch scheduler
-        self.criterion = None # Loss
+        self.criterion = None  # Loss
         self.accumulate: int = -1
         # ---
         # self.compute_loss_ota = None
@@ -204,7 +206,7 @@ class Trainer:
         # Start training ------------------------------------------------------------------------
         for epoch in range(start_epoch, self.config["epochs"]):
             # --- Forward, backward, optimization ---
-            s = self.train_one_epoch(train_dataloader=train_dataloader, epoch=epoch)
+            progress_description: str = self.train_one_epoch(train_dataloader=train_dataloader, epoch=epoch)
 
             # --- Scheduler ---
             self.scheduler.step()
@@ -216,7 +218,7 @@ class Trainer:
 
             # --- Write results ---
             with open(results_file, 'a') as ckpt:
-                ckpt.write(s + '%10.4g' * 7 % results + '\n')  # append metrics, val_loss
+                ckpt.write(progress_description + '%10.4g' * 7 % results + '\n')  # append metrics, val_loss
 
             # weighted combination of metrics
             fitness_value = fitness(np.array(results).reshape(1, -1))
@@ -414,12 +416,12 @@ class Trainer:
     #     # return False
 
 
-class DummyDataset(Dataset):
-    def __getitem__(self, index):
-        return torch.zeros(3, 224, 224), torch.zeros(1, dtype=torch.long), ""
-
-    def __len__(self):
-        return 1
+# class DummyDataset(Dataset):
+#     def __getitem__(self, index):
+#         return torch.zeros(3, 224, 224), torch.zeros(1, dtype=torch.long), ""
+#
+#     def __len__(self):
+#         return 1
 
 
 def main():
@@ -439,8 +441,8 @@ def main():
     with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
         hyp = yaml.safe_load(f)
 
-    train, val = torch.utils.data.DataLoader(DummyDataset()), torch.utils.data.DataLoader(DummyDataset())
-    trainer = Trainer(CNN, config=config, hyperparameters=hyp, logger=logger)
+    train = torch.utils.data.DataLoader(MNISTDataset())
+    trainer = Trainer(ImportanceWeightedCNN, config=config, hyperparameters=hyp, logger=logger)
     trainer.train(train)
 
 
