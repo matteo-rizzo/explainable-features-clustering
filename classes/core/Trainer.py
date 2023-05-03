@@ -16,6 +16,7 @@ from tqdm import tqdm
 
 from classes.deep_learning.architectures.CNN import CNN
 from classes.deep_learning.architectures.TorchModel import TorchModel
+from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from classes.factories.OptimizerFactory import OptimizerFactory
 from functional.lr_schedulers import linear_lrs, one_cycle_lrs
@@ -48,6 +49,7 @@ class Trainer:
         # self.exponential_moving_average = None
         self.lr_schedule_fn = None  # Scheduling function
         self.scheduler = None  # Torch scheduler
+        self.criterion = None # Loss
         self.accumulate: int = -1
         # ---
         # self.compute_loss_ota = None
@@ -93,25 +95,19 @@ class Trainer:
         epoch_description: str = ""
         batch_number: int = len(train_dataloader)
         progress_bar = tqdm(enumerate(train_dataloader), total=batch_number)
-        # --- Zero gradient and train batch ---
+        # --- Zero gradient once and train batches ---
         self.optimizer.zero_grad()
 
         # Number of warmup iterations, max(e.g. 3 epochs, 1k iterations)
         warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)
-        for i, (imgs, targets, paths, _) in progress_bar:
+        for idx, (imgs, targets, paths) in progress_bar:
 
-            imgs, n_integrated_batches = self.__warmup_batch(imgs, batch_number, epoch, i, warmup_number)
+            imgs, n_integrated_batches = self.__warmup_batch(imgs, batch_number, epoch, idx, warmup_number)
             # --- Forward ---
-            with amp.autocast(enabled=self.device[:4] == "cuda:0"[:4]):
+            with amp.autocast(enabled=self.device.type[:4] == "cuda"):
                 # --- Forward pass ---
-                pred = self.model(imgs)
-
-                if 'loss_ota' not in self.hyperparameters or self.hyperparameters['loss_ota'] == 1:
-                    loss, loss_items = self.compute_loss_ota(pred, targets.to(self.config["device"]),
-                                                             imgs)  # losses scaled by batch_size
-                else:
-                    # losses scaled by batch_size
-                    loss, loss_items = self.compute_loss(pred, targets.to(self.config["device"]))
+                preds = self.model(imgs)
+                loss = self.criterion(preds, targets.to(self.config["device"]))
 
                 # --- Backward ---
                 self.gradient_scaler.scale(loss).backward()
@@ -125,7 +121,8 @@ class Trainer:
                     #     self.exponential_moving_average.update(self.model)
 
                 # --- Console logging ---
-                mean_loss = (mean_loss * i + loss_items) / (i + 1)  # update mean losses
+                # mean_loss = (mean_loss * idx + loss_items) / (idx + 1)  # update mean losses
+
                 mem = '%.3gG' % (torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
 
                 s = (f"\t{colorstr('bold', 'magenta', 'Epoch')}: {epoch}/{self.config['epochs'] - 1}"
@@ -133,46 +130,13 @@ class Trainer:
                      # f"\t{colorstr('bold', 'magenta', 'box')}: {box_loss:.4f}"
                      # f"\t{colorstr('bold', 'magenta', 'obj')}: {obj_loss:.4f}"
                      # f"\t{colorstr('bold', 'magenta', 'cls')}: {cls_loss:.4f}"
-                     f"\t{colorstr('bold', 'magenta', 'mean loss')}: {mean_loss:.4f}"
+                     f"\t{colorstr('bold', 'magenta', 'loss')}: {loss:.4f}"
                      f"\t{colorstr('bold', 'magenta', 'labels')}: {targets.shape[0]}"
                      f"\t{colorstr('bold', 'magenta', 'img_size')}: {imgs.shape[-1]}"
                      )
                 progress_bar.set_description(s)
 
         return epoch_description
-        # print(f"\n *** Epoch {epoch + 1}/{self.__epochs} *** ")
-        #
-        # self.model.train_mode()
-        # running_loss, running_accuracy = 0.0, 0.0
-        #
-        # # Visual progress bar
-        # tqdm_bar = tqdm(training_loader, total=len(training_loader), unit="batch", file=sys.stdout)
-        # tqdm_bar.set_description_str(" Training  ")
-        #
-        # # Process batches
-        # for i, (x, y) in enumerate(training_loader):
-        #     tqdm_bar.update(1)
-        #     # Zero gradients
-        #     self.model.reset_gradient()
-        #
-        #     # Forward pass
-        #     y = y.long().to(self.__device)
-        #     o = self.model.predict(x).to(self.__device)
-        #
-        #     # Loss, backward pass, step
-        #     running_loss += self.model.update_weights(o, y)
-        #     running_accuracy += Evaluator.batch_accuracy(o, y)
-        #
-        #     # Log current epoch result
-        #     if not (i + 1) % self.__log_every:
-        #         avg_loss, avg_accuracy = running_loss / self.__log_every, running_accuracy / self.__log_every
-        #         running_loss, running_accuracy = 0.0, 0.0
-        #         # Update progress bar
-        #         progress: str = f"[ Loss: {avg_loss:.4f} | Batch accuracy: {avg_accuracy:.4f} ]"
-        #         tqdm_bar.set_postfix_str(progress)
-        # # Close progress bar for this epoch
-        # tqdm_bar.close()
-        # print(" ...........................................................")
 
     def __warmup_batch(self, imgs, batch_number: int, epoch: int, i: int, warmup_number: int):
         n_integrated_batches: int = i + batch_number * epoch  # number integrated batches (since train start)
@@ -193,7 +157,7 @@ class Trainer:
                                                self.hyperparameters['momentum']])
         return imgs, n_integrated_batches
 
-    def train(self, train_dataloader, val_dataloader):
+    def train(self, train_dataloader):
         # --- Directories, initialize where things are saved ---
         self.__start_or_resume_config()
         save_dir, weights_dir, last_ckpt, best_ckpt, results_file = self.__init_dump_folder()
@@ -206,8 +170,9 @@ class Trainer:
         self.accumulate: int = self.__setup_gradient_accumulation()
 
         # --- Optimization ---
-        # TODO: make optional / modularize
         self.optimizer: torch.optim.Optimizer = self.__setup_optimizer()
+        self.criterion = self.__setup_criterion()
+        # TODO: make optional / modularize
         self.scheduler: torch.optim.lr_scheduler = self.__setup_scheduler()
 
         # --- Exponential moving average ---
@@ -223,7 +188,7 @@ class Trainer:
         # TODO: change
         results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
         self.scheduler.last_epoch = start_epoch - 1  # do not move
-        self.gradient_scaler = amp.GradScaler(enabled=self.device[:4] == "cuda:0"[:4])
+        self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
         # self.compute_loss_ota = ComputeLossOTA(self.model)  # init losses class
         # self.compute_loss = ComputeLoss(self.model)  # init losses class
         self.logger.info(f'{colorstr("bright_green", "Image sizes")}: TRAIN [{self.config["img_size"][0]}] , '
@@ -302,7 +267,7 @@ class Trainer:
             self.logger.info(f'Starting a new training')
 
     def __init_dump_folder(self) -> [Path, Path, Path, Path, Path]:
-        save_dir: Path = Path(self.config["save_dir"])
+        save_dir: Path = Path(f'{self.config["save_dir"]}')
         weights_dir: Path = save_dir / 'weights'
         weights_dir.mkdir(parents=True, exist_ok=True)
         last_ckpt: Path = weights_dir / 'last.pt'
@@ -357,6 +322,9 @@ class Trainer:
         # TODO: look up different optimization for different parameter groups
         return OptimizerFactory(nn.ParameterList(self.model.parameters()),
                                 hyperparameters=self.hyperparameters).get(self.config["optimizer"])
+
+    def __setup_criterion(self) -> torch.nn.modules.loss:
+        return CriterionFactory().get(self.config["criterion"])
 
     def __resume_pretrained(self, results_file) -> [int, float]:
         # --- Optimizer ---
@@ -448,7 +416,7 @@ class Trainer:
 
 class DummyDataset(Dataset):
     def __getitem__(self, index):
-        return torch.zeros(3, 224, 224), torch.zeros(1, dtype=torch.long)
+        return torch.zeros(3, 224, 224), torch.zeros(1, dtype=torch.long), ""
 
     def __len__(self):
         return 1
@@ -473,7 +441,7 @@ def main():
 
     train, val = torch.utils.data.DataLoader(DummyDataset()), torch.utils.data.DataLoader(DummyDataset())
     trainer = Trainer(CNN, config=config, hyperparameters=hyp, logger=logger)
-    trainer.train(train, val)
+    trainer.train(train)
 
 
 if __name__ == "__main__":
