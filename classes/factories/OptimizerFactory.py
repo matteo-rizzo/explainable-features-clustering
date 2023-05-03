@@ -1,17 +1,19 @@
-from typing import List
-
 import torch
+import torch.nn as nn
 from torch import optim
-from transformers import AdamW
 
 
 class OptimizerFactory:
 
-    def __init__(self, network_parameters: List, learning_rate: float):
+    def __init__(self, network_parameters: nn.ParameterList, hyperparameters: dict):
         self.optimizers_map = {
-            "SGD": optim.SGD(network_parameters, lr=learning_rate, momentum=0.9, nesterov=True),
-            "Adam": optim.Adam(network_parameters, lr=learning_rate),
-            "AdamW": AdamW(network_parameters, lr=learning_rate, correct_bias=False),
+            "SGD": optim.SGD(network_parameters, lr=hyperparameters["lr0"],
+                             momentum=hyperparameters['momentum'],
+                             nesterov=True),
+            "Adam": optim.Adam(network_parameters, lr=hyperparameters["lr0"],
+                               betas=(hyperparameters['momentum'], 0.999)),
+            "AdamW": optim.AdamW(network_parameters, lr=hyperparameters["lr0"],
+                                 betas=(hyperparameters['momentum'], 0.999)),
         }
 
     def get(self, optimizer_type: str) -> torch.optim:

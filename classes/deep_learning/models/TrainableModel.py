@@ -81,7 +81,8 @@ class TrainableModel:
         :return: an optimizer in {Adam, SGD}
         """
         print("\n Optimizer: {} (learning rate is {})".format(optimizer_type, learning_rate))
-        self.__optimizer = OptimizerFactory(list(self._network.parameters()), learning_rate).get(optimizer_type)
+        self.__optimizer = OptimizerFactory(list(self._network.parameters()),
+                                            {"lr0": learning_rate}).get(optimizer_type)
 
     def set_criterion(self, criterion_type: str):
         """

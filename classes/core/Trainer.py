@@ -1,10 +1,11 @@
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Type
 
 import colorlog
 import torch
+import torch.nn as nn
 import yaml
 from torch.cuda import amp
 from torch.utils.data import Dataset
@@ -12,6 +13,7 @@ from torch.utils.data import Dataset
 from classes.deep_learning.architectures.CNN import CNN
 from classes.deep_learning.architectures.TorchModel import TorchModel
 from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
+from classes.factories.OptimizerFactory import OptimizerFactory
 from functional.lr_schedulers import linear_lrs, one_cycle_lrs
 from functional.setup import get_device
 from functional.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run, colorstr
@@ -24,7 +26,7 @@ from functional.utils import intersect_dicts, increment_path, check_file_exists,
 
 class Trainer:
 
-    def __init__(self, model_class: TorchModel, config: dict, hyperparameters: dict, logger):
+    def __init__(self, model_class: Type[TorchModel], config: dict, hyperparameters: dict, logger):
         self.config = config
         self.hyperparameters = hyperparameters
         self.logger = logger
@@ -108,7 +110,7 @@ class Trainer:
         # print(" ...........................................................")
 
     def train(self, train_dataloader, val_dataloader):
-        # --- Directories, initialize where to save things ---
+        # --- Directories, initialize where things are saved ---
         self.__start_or_resume_config()
         save_dir, weights_dir, last_ckpt, best_ckpt, results_file = self.__init_dump_folder()
 
@@ -140,9 +142,10 @@ class Trainer:
         # img_size, img_size_test = [check_img_size(x, grid_size, logger=self.logger) for x in self.config["img_size"]]
 
         batch_number: int = len(train_dataloader)
-        # Number of warmup iterations, max(3 epochs, 1k iterations)
+        # Number of warmup iterations, max(e.g. 3 epochs, 1k iterations)
         warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)
 
+        # TODO: change
         results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
         self.scheduler.last_epoch = start_epoch - 1  # do not move
         self.gradient_scaler = amp.GradScaler(enabled=self.device == "cuda:0")
@@ -152,7 +155,7 @@ class Trainer:
                          f'TEST [{self.config["img_size"][1]}]\t'
                          f'{colorstr("bright_green", "Dataloader workers")}: {train_dataloader.num_workers}\t'
                          f'{colorstr("bright_green", "Saving results to")}: {save_dir}\n'
-                         f'{" "*31}{colorstr("bright_green", "Starting training for")} {self.config["epochs"]} epochs...')
+                         f'{" " * 31}{colorstr("bright_green", "Starting training for")} {self.config["epochs"]} epochs...')
 
         torch.save(self.model, weights_dir / 'init.pt')
         epoch: int = -1
@@ -188,7 +191,7 @@ class Trainer:
     def __init_dump_folder(self) -> [Path, Path, Path, Path, Path]:
         save_dir: Path = Path(self.config["save_dir"])
         weights_dir: Path = save_dir / 'weights'
-        weights_dir.mkdir(parents=True, exist_ok=True)  # make dir
+        weights_dir.mkdir(parents=True, exist_ok=True)
         last_ckpt: Path = weights_dir / 'last.pt'
         best_ckpt: Path = weights_dir / 'best.pt'
         results_file: Path = save_dir / 'results.txt'
@@ -201,20 +204,22 @@ class Trainer:
         return save_dir, weights_dir, last_ckpt, best_ckpt, results_file
 
     def __setup_model(self, pretrained: bool) -> None:
+        # If pretrained, load checkpoint
         if pretrained:
-            self.checkpoint = torch.load(self.config["weights"], map_location=self.device)  # load checkpoint
+            self.checkpoint = torch.load(self.config["weights"], map_location=self.device)
             self.model = self.model_class(
                 config_path=self.config["architecture_config"] or self.checkpoint['model'].yaml,
                 logger=self.logger).to(self.device)
             state_dict = self.checkpoint['model'].float().state_dict()  # to FP32
             state_dict = intersect_dicts(state_dict, self.model.state_dict(), exclude=[])  # intersect
-            self.model.load_state_dict(state_dict, strict=False)  # load
+            self.model.load_state_dict(state_dict, strict=False)
             self.logger.info(
                 f'Transferred {len(state_dict):g}/{len(self.model.state_dict()):g} '
-                f'items from {self.config["weights"]}')  # report
+                f'items from {self.config["weights"]}')
+        # Else initialize a new model
         else:
-            self.model = self.model_class(config_path=self.config["architecture_config"], logger=self.logger).to(
-                self.device)
+            self.model = self.model_class(config_path=self.config["architecture_config"],
+                                          logger=self.logger).to(self.device)
 
     def __setup_gradient_accumulation(self) -> int:
         # If the total batch size is less than or equal to the nominal batch size, then accumulate is set to 1.
@@ -227,7 +232,6 @@ class Trainer:
         return accumulate
 
     def __setup_scheduler(self) -> torch.optim.lr_scheduler:
-        # TODO: replace with scheduler factory
         if self.config["linear_lr"]:
             lr_schedule_fn = linear_lrs(steps=self.config["epochs"],
                                         lrf=self.hyperparameters['lrf'])
@@ -237,16 +241,18 @@ class Trainer:
         return torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lr_schedule_fn)
 
     def __setup_optimizer(self) -> torch.optim.Optimizer:
-        # TODO: replace with optimizer factory
-        if self.config["adam"]:
-            optimizer = torch.optim.Adam(self.model.parameters(), lr=self.hyperparameters['lr0'],
-                                         betas=(self.hyperparameters['momentum'], 0.999))  # adjust beta1 to momentum
-        else:
-            optimizer = torch.optim.SGD(self.model.parameters(), lr=self.hyperparameters['lr0'],
-                                        momentum=self.hyperparameters['momentum'],
-                                        nesterov=True)
         # TODO: look up different optimization for different parameter groups
-        return optimizer
+        return OptimizerFactory(nn.ParameterList(self.model.parameters()),
+                                hyperparameters=self.hyperparameters).get(self.config["optimizer"])
+
+        # if self.config["adam"]:
+        #     optimizer = torch.optim.Adam(self.model.parameters(), lr=self.hyperparameters['lr0'],
+        #                                  betas=(self.hyperparameters['momentum'], 0.999))  # adjust beta1 to momentum
+        # else:
+        #     optimizer = torch.optim.SGD(self.model.parameters(), lr=self.hyperparameters['lr0'],
+        #                                 momentum=self.hyperparameters['momentum'],
+        #                                 nesterov=True)
+        # return optimizer
 
     def __resume_pretrained(self, results_file) -> [int, float]:
         # --- Optimizer ---
@@ -265,6 +271,7 @@ class Trainer:
             results_file.write_text(self.checkpoint['training_results'])  # write results.txt
 
         # --- Epochs ---
+        # TODO: check
         start_epoch = self.checkpoint['epoch'] + 1
         if self.config["resume"]:
             assert start_epoch > 0, f'{self.config["weights"]} training to ' \
