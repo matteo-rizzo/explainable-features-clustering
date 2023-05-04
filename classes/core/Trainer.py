@@ -102,7 +102,7 @@ class Trainer:
 
         # Number of warmup iterations, max(e.g. 3 epochs, 1k iterations)
         warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)
-        for idx, (imgs, targets, paths) in progress_bar:
+        for idx, (imgs, targets) in progress_bar:
 
             imgs, n_integrated_batches = self.__warmup_batch(imgs, batch_number, epoch, idx, warmup_number)
             # --- Forward ---
@@ -442,7 +442,7 @@ def main():
         hyp = yaml.safe_load(f)
 
     train = torch.utils.data.DataLoader(MNISTDataset())
-    trainer = Trainer(ImportanceWeightedCNN, config=config, hyperparameters=hyp, logger=logger)
+    trainer = Trainer(CNN, config=config, hyperparameters=hyp, logger=logger)
     trainer.train(train)
 
 
