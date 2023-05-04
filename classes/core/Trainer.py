@@ -16,8 +16,6 @@ from tqdm import tqdm
 
 from classes.MNISTDataset import MNISTDataset
 from classes.deep_learning.architectures.CNN import CNN
-from classes.deep_learning.architectures.ImportanceWeightedCNN import ImportanceWeightedCNN
-from classes.deep_learning.architectures.ParsableModels import ParsableCNN
 from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from classes.factories.OptimizerFactory import OptimizerFactory
@@ -383,11 +381,14 @@ class Trainer:
             torch.save(checkpoint, weights_dir / f'epoch_{epoch:03d}.pt')
 
     def __print_model(self):
-        self.logger.info(f'{"idx":>1}{"params":>10}  {"module":<40}{"arguments":<30}')
+        self.logger.info(f'{"idx":>1}{"params":>10}  {"module":<40}{"parameters":<30}')
+        self.logger.info(f'{"-" * 95}')
         for idx, module in enumerate(list(self.model.modules())[1:]):
             module_type = str(module.__class__)[8:-2]
             parameters = sum(dict((p.data_ptr(), p.numel()) for p in module.parameters()).values())
-            self.logger.info(f'{idx:>3}{parameters:10.0f}  {module_type:<40}{0}')
+            arguments = str(module)[len(module_type.split(".")[-1]):]
+            self.logger.info(f'{idx:>3}{parameters:10.0f}  {module_type:<40}{arguments}')
+        self.logger.info(f'{"-" * 95}')
     # def __early_stopping_check(self, metric_value: float) -> bool:
     #     pass
     #     # """
@@ -422,14 +423,6 @@ class Trainer:
     #     # return False
 
 
-# class DummyDataset(Dataset):
-#     def __getitem__(self, index):
-#         return torch.zeros(3, 224, 224), torch.zeros(1, dtype=torch.long), ""
-#
-#     def __len__(self):
-#         return 1
-
-
 def main():
     logger = logging.getLogger(__name__)
     logger.setLevel("INFO")
@@ -448,7 +441,7 @@ def main():
         hyp = yaml.safe_load(f)
 
     train = torch.utils.data.DataLoader(MNISTDataset())
-    trainer = Trainer(ParsableCNN, config=config, hyperparameters=hyp, logger=logger)
+    trainer = Trainer(CNN, config=config, hyperparameters=hyp, logger=logger)
     trainer.train(train)
 
 
