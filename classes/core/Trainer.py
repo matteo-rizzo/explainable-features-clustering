@@ -17,7 +17,7 @@ from tqdm import tqdm
 from classes.MNISTDataset import MNISTDataset
 from classes.deep_learning.architectures.CNN import CNN
 from classes.deep_learning.architectures.ImportanceWeightedCNN import ImportanceWeightedCNN
-from classes.deep_learning.architectures.TorchModel import TorchModel
+from classes.deep_learning.architectures.ParsableModels import TorchParsableModel
 from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from classes.factories.OptimizerFactory import OptimizerFactory
@@ -41,7 +41,7 @@ def fitness(x):
 
 class Trainer:
 
-    def __init__(self, model_class: Type[TorchModel], config: dict, hyperparameters: dict, logger):
+    def __init__(self, model_class: Type[TorchParsableModel], config: dict, hyperparameters: dict, logger):
         self.config = config
         self.hyperparameters = hyperparameters
         self.logger = logger
