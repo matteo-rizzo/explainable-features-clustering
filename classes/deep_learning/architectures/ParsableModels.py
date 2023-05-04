@@ -17,7 +17,7 @@ class TorchParsableModel(nn.Module):
         self.model = parse_model(cfg, logger=logger)
         logger.info(f'{"-" * 95}')
 
-    def forward(self, x):
+    def forward(self, x) -> Tensor:
         y, dt = [], []  # outputs
         for layer in self.model:
             # layer.f indicates "where from"
@@ -34,17 +34,21 @@ class ParsableCNN(TorchParsableModel):
 
     def __init__(self, config_path: str = "config/architectures/cnn.yaml",
                  logger: logging.Logger = logging.getLogger(__name__)):
+        if config_path == "default":
+            config_path = "config/architectures/cnn.yaml"
         logger.info(f'{"-" * 95}')
         super(ParsableCNN, self).__init__(config_path=config_path, logger=logger)
 
-    def forward(self, x):
-        super().forward(x)
+    def forward(self, x) -> Tensor:
+        return super().forward(x)
 
 
-class ImportanceWeightedCNN(ParsableCNN):
+class ParsableImportanceWeightedCNN(ParsableCNN):
 
     def __init__(self, config_path: str = "config/architectures/importance_weighted_cnn.yaml",
                  logger: logging.Logger = logging.getLogger(__name__)):
+        if config_path == "default":
+            config_path = "config/architectures/importance_weighted_cnn.yaml"
         # ----------------------------------------------------
         with open(config_path, "r") as f:
             cfg = yaml.safe_load(f)
@@ -55,8 +59,8 @@ class ImportanceWeightedCNN(ParsableCNN):
         logger.info(f'{" ":>3}{" ":>18}{" ":>3}{np.prod(weight.shape):10.0f}  '
                     f'{str(weight.__class__)[8:-2]:<40}{cfg["importance_weight_layer"]}')
         # ----------------------------------------------------
-        super(ImportanceWeightedCNN, self).__init__(config_path=config_path,
-                                                    logger=logger)
+        super(ParsableImportanceWeightedCNN, self).__init__(config_path=config_path,
+                                                            logger=logger)
 
         self.__importance_weight = weight
 

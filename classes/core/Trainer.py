@@ -17,7 +17,7 @@ from tqdm import tqdm
 from classes.MNISTDataset import MNISTDataset
 from classes.deep_learning.architectures.CNN import CNN
 from classes.deep_learning.architectures.ImportanceWeightedCNN import ImportanceWeightedCNN
-from classes.deep_learning.architectures.ParsableModels import TorchParsableModel
+from classes.deep_learning.architectures.ParsableModels import ParsableCNN
 from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from classes.factories.OptimizerFactory import OptimizerFactory
@@ -125,15 +125,16 @@ class Trainer:
                 # --- Console logging ---
                 # mean_loss = (mean_loss * idx + loss_items) / (idx + 1)  # update mean losses
 
-                mem = '%.3gG' % (torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
-
+                mem = f'{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.3g}G'  # (GB)
+                max_mem = torch.cuda.get_device_properties(self.device.index).total_memory
+                total_mem = f"{(max_mem / 1E9) if torch.cuda.is_available() else 0:.3g}G"
                 s = (f"\t{colorstr('bold', 'magenta', 'Epoch')}: {epoch}/{self.config['epochs'] - 1}"
-                     f"\t{colorstr('bold', 'magenta', 'gpu_mem')}: {mem}"
+                     f"\t{colorstr('bold', 'magenta', 'gpu_mem')}: {mem}/{total_mem}"
                      # f"\t{colorstr('bold', 'magenta', 'box')}: {box_loss:.4f}"
                      # f"\t{colorstr('bold', 'magenta', 'obj')}: {obj_loss:.4f}"
                      # f"\t{colorstr('bold', 'magenta', 'cls')}: {cls_loss:.4f}"
                      f"\t{colorstr('bold', 'magenta', 'loss')}: {loss:.4f}"
-                     f"\t{colorstr('bold', 'magenta', 'labels')}: {targets.shape[0]}"
+                     # f"\t{colorstr('bold', 'magenta', 'labels')}: {targets.shape[0]}"
                      f"\t{colorstr('bold', 'magenta', 'img_size')}: {imgs.shape[-1]}"
                      )
                 progress_bar.set_description(s)
@@ -167,7 +168,7 @@ class Trainer:
         # --- Model ---
         pretrained: bool = self.config["weights"].endswith('.pt')
         self.__setup_model(pretrained=pretrained)
-
+        self.__print_model()
         # --- Gradient accumulation ---
         self.accumulate: int = self.__setup_gradient_accumulation()
 
@@ -259,10 +260,9 @@ class Trainer:
             # Check files exist. The return is either the same path (if it was correct)
             # Or an updated path if it was found (uniquely) in the path's subdirectories
             self.config["data"] = check_file_exists(self.config["data"])
-            self.config["architecture_config"] = check_file_exists(self.config["architecture_config"])
+            if not self.config["architecture_config"] == "default":
+                self.config["architecture_config"] = check_file_exists(self.config["architecture_config"])
             self.config["hyperparameters"] = check_file_exists(self.config["hyperparameters"])
-            assert len(self.config["architecture_config"]) or len(self.config["weights"]), \
-                'either architecture_config or weights must be specified'
             # Increment run
             self.config["save_dir"] = increment_path(Path(self.config["project"]) / self.config["name"],
                                                      exist_ok=self.config["exist_ok"])
@@ -382,6 +382,12 @@ class Trainer:
         elif epoch >= (self.config["epochs"] - 5):
             torch.save(checkpoint, weights_dir / f'epoch_{epoch:03d}.pt')
 
+    def __print_model(self):
+        self.logger.info(f'{"idx":>1}{"params":>10}  {"module":<40}{"arguments":<30}')
+        for idx, module in enumerate(list(self.model.modules())[1:]):
+            module_type = str(module.__class__)[8:-2]
+            parameters = sum(dict((p.data_ptr(), p.numel()) for p in module.parameters()).values())
+            self.logger.info(f'{idx:>3}{parameters:10.0f}  {module_type:<40}{0}')
     # def __early_stopping_check(self, metric_value: float) -> bool:
     #     pass
     #     # """
@@ -442,7 +448,7 @@ def main():
         hyp = yaml.safe_load(f)
 
     train = torch.utils.data.DataLoader(MNISTDataset())
-    trainer = Trainer(ImportanceWeightedCNN, config=config, hyperparameters=hyp, logger=logger)
+    trainer = Trainer(ParsableCNN, config=config, hyperparameters=hyp, logger=logger)
     trainer.train(train)
 
 

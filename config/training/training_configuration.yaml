@@ -19,7 +19,7 @@ logger: "INFO"
 
 # --- Configuration files and paths ---
 data: "config/datasets/mnist.yaml" # data.yaml path
-architecture_config: "config/architectures/importance_weighted_cnn.yaml"
+architecture_config: "default"
 weights: "" # Initial weights path
 hyperparameters: "config/training/hypeparameter_configuration.yaml"  # Hyperparameters path
 project: "dumps/train" # save to project/name
