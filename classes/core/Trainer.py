@@ -41,7 +41,7 @@ def fitness(x):
 
 class Trainer:
 
-    def __init__(self, model_class: Type[TorchParsableModel], config: dict, hyperparameters: dict, logger):
+    def __init__(self, model_class: Type[nn.Module], config: dict, hyperparameters: dict, logger):
         self.config = config
         self.hyperparameters = hyperparameters
         self.logger = logger
@@ -442,7 +442,7 @@ def main():
         hyp = yaml.safe_load(f)
 
     train = torch.utils.data.DataLoader(MNISTDataset())
-    trainer = Trainer(CNN, config=config, hyperparameters=hyp, logger=logger)
+    trainer = Trainer(ImportanceWeightedCNN, config=config, hyperparameters=hyp, logger=logger)
     trainer.train(train)
 
 

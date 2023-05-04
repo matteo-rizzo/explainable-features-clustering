@@ -14,7 +14,7 @@ class ImportanceWeightedCNN(CNN):
                  logger: logging.Logger = logging.getLogger(__name__)):
         super(ImportanceWeightedCNN, self).__init__(config_path=config_path,
                                                     logger=logger)
-        self.__importance_weight = nn.Parameter(torch.ones(1, 3, 32, 32))
+        self.__importance_weight = nn.Parameter(torch.ones(1, 1, 28, 28))
 
     def forward(self, x: Tensor) -> Tensor:
         x = x * self.__importance_weight
