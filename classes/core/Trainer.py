@@ -3,12 +3,13 @@ import os
 import time
 from copy import deepcopy
 from pathlib import Path
-from typing import Optional, Type
+from typing import Optional, Type, Callable
 
 import colorlog
 import numpy as np
 import torch
 import torch.nn as nn
+import torchmetrics
 import yaml
 from torch.cuda import amp
 from torch.utils.data import Dataset
@@ -25,10 +26,6 @@ from functional.torch_utils import strip_optimizer
 from functional.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run, colorstr
 
 
-# from classifiers.deep_learning.classes.core.Evaluator import Evaluator
-# from classifiers.deep_learning.classes.factories.ModelFactory import ModelFactory
-# from classifiers.deep_learning.classes.utils.Params import Params
-
 def fitness(x):
     # FIXME: to change
     # IDEA: could change these weights
@@ -39,54 +36,23 @@ def fitness(x):
 
 class Trainer:
 
-    def __init__(self, model_class: Type[nn.Module], config: dict, hyperparameters: dict, logger):
-        self.config = config
-        self.hyperparameters = hyperparameters
-        self.logger = logger
+    def __init__(self, model_class: Type[nn.Module], config: dict, hyperparameters: dict, logger: logging.Logger):
+        self.config: dict = config
+        self.hyperparameters: dict = hyperparameters
+        self.logger: logging.Logger = logger
         # --- Training stuff ---
-        self.optimizer = None
-        self.gradient_scaler = None
+        self.optimizer: Optional[torch.optim.Optimizer] = None
+        self.gradient_scaler: Optional[amp.GradScaler] = None
         # self.exponential_moving_average = None
-        self.lr_schedule_fn = None  # Scheduling function
-        self.scheduler = None  # Torch scheduler
-        self.criterion = None  # Loss
+        self.lr_schedule_fn: Optional[Callable] = None  # Scheduling function
+        self.scheduler: torch.optim.lr_scheduler = None  # Torch scheduler
+        self.criterion: torch.nn.modules.loss = None  # Loss
         self.accumulate: int = -1
         # ---
-        # self.compute_loss_ota = None
-        # self.compute_loss = None
-        # ---
         self.device: Optional[torch.device] = get_device(config["device"])
-        # ---
-        self.model_class = model_class
-        self.model = None
+        self.model_class: Type[nn.Module] = model_class
+        self.model: Optional[nn.Module] = None
         self.checkpoint = None
-
-        # self.path_to_best_model = path_to_best_model
-        #
-        # self.device = config["device"]
-        # self.epochs = config["epochs"]
-        # # self.optimizer_type = config["optimizer"]
-        # self.lr = config["learning_rate"]
-        #
-        # self.log_every = config["log_every"]
-        # self.evaluate_every = config["evaluate_every"]
-        #
-        # self.patience = config["early_stopping"]["patience"]
-        # self.es_metric = config["early_stopping"]["metrics"]
-        # self.es_metric_trend = config["early_stopping"]["metrics_trend"]
-        # self.es_metric_best_value = 0.0 if self.__es_metric_trend == "increasing" else 1000
-        # self.epochs_no_improvement = 0
-        #
-        # # network_type, criterion_type = train_params["network_type"], train_params["criterion"]
-        #
-        # network_params = Params.load_network_params(network_type)
-        # network_params["device"] = self.__device
-        #
-        # self.model = ModelFactory().get(network_type, network_params)
-        # self.model.set_optimizer(self.__optimizer_type, self.__lr)
-        # self.model.set_criterion(criterion_type)
-        #
-        # self.evaluator = Evaluator(self.__device, config["num_classes"]
 
     def train_one_epoch(self, train_dataloader: torch.utils.data.DataLoader, epoch: int):
         # --- Enable training ---
@@ -98,12 +64,11 @@ class Trainer:
         # --- Zero gradient once and train batches ---
         self.optimizer.zero_grad()
 
-        # Number of warmup iterations, max(e.g. 3 epochs, 1k iterations)
+        # Number of warmup iterations, max(config epochs (e.g., 3), 1k iterations)
         warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)
         for idx, (imgs, targets) in progress_bar:
 
             imgs, n_integrated_batches = self.__warmup_batch(imgs, batch_number, epoch, idx, warmup_number)
-            # --- Forward ---
             with amp.autocast(enabled=self.device.type[:4] == "cuda"):
                 # --- Forward pass ---
                 preds = self.model(imgs)
@@ -114,32 +79,31 @@ class Trainer:
 
                 # --- Optimization ---
                 if n_integrated_batches % self.accumulate == 0:
-                    self.gradient_scaler.step(self.optimizer)  # optimizer.step
+                    # Optimizer.step
+                    self.gradient_scaler.step(self.optimizer)
                     self.gradient_scaler.update()
+                    # Gradient reset
                     self.optimizer.zero_grad()
                     # if self.exponential_moving_average:
                     #     self.exponential_moving_average.update(self.model)
 
                 # --- Console logging ---
-                # mean_loss = (mean_loss * idx + loss_items) / (idx + 1)  # update mean losses
-
-                mem = f'{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.3g}G'  # (GB)
-                max_mem = torch.cuda.get_device_properties(self.device.index).total_memory
-                total_mem = f"{(max_mem / 1E9) if torch.cuda.is_available() else 0:.3g}G"
-                s = (f"\t{colorstr('bold', 'magenta', 'Epoch')}: {epoch}/{self.config['epochs'] - 1}"
+                mem: str = f'{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2g}G'
+                max_mem: float = torch.cuda.get_device_properties(self.device.index).total_memory
+                total_mem: str = f"{(max_mem / 1E9) if torch.cuda.is_available() else 0:.2g}G"
+                s = (f"{colorstr('bold', 'magenta', '[TRAIN]')}"
+                     f"\t{colorstr('bold', 'magenta', 'Epoch')}: {epoch}/{self.config['epochs'] - 1}"
                      f"\t{colorstr('bold', 'magenta', 'gpu_mem')}: {mem}/{total_mem}"
-                     # f"\t{colorstr('bold', 'magenta', 'box')}: {box_loss:.4f}"
-                     # f"\t{colorstr('bold', 'magenta', 'obj')}: {obj_loss:.4f}"
-                     # f"\t{colorstr('bold', 'magenta', 'cls')}: {cls_loss:.4f}"
                      f"\t{colorstr('bold', 'magenta', 'loss')}: {loss:.4f}"
-                     # f"\t{colorstr('bold', 'magenta', 'labels')}: {targets.shape[0]}"
-                     f"\t{colorstr('bold', 'magenta', 'img_size')}: {imgs.shape[-1]}"
+                     f"\t{colorstr('bold', 'magenta', 'img_size')}: {imgs.shape[-2]}x{imgs.shape[-1]}"
                      )
                 progress_bar.set_description(s)
 
         return epoch_description
 
-    def __warmup_batch(self, imgs, batch_number: int, epoch: int, i: int, warmup_number: int):
+    def __warmup_batch(self, imgs: torch.Tensor, batch_number: int,
+                       epoch: int, i: int, warmup_number: int) -> [torch.Tensor, int]:
+
         n_integrated_batches: int = i + batch_number * epoch  # number integrated batches (since train start)
         imgs = imgs.to(self.device, non_blocking=True).float() / 255.0  # uint8 to float32, 0-255 to 0.0-1.0
         if n_integrated_batches <= warmup_number:
@@ -158,7 +122,7 @@ class Trainer:
                                                self.hyperparameters['momentum']])
         return imgs, n_integrated_batches
 
-    def train(self, train_dataloader):
+    def train(self, train_dataloader: torch.utils.data.DataLoader, test_dataloader: torch.utils.data.DataLoader = None):
         # --- Directories, initialize where things are saved ---
         self.__start_or_resume_config()
         save_dir, weights_dir, last_ckpt, best_ckpt, results_file = self.__init_dump_folder()
@@ -172,7 +136,7 @@ class Trainer:
 
         # --- Optimization ---
         self.optimizer: torch.optim.Optimizer = self.__setup_optimizer()
-        self.criterion = self.__setup_criterion()
+        self.criterion: torch.nn.modules.loss = self.__setup_criterion()
         # TODO: make optional / modularize
         self.scheduler: torch.optim.lr_scheduler = self.__setup_scheduler()
 
@@ -190,10 +154,10 @@ class Trainer:
         results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
         self.scheduler.last_epoch = start_epoch - 1  # do not move
         self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
-        # self.compute_loss_ota = ComputeLossOTA(self.model)  # init losses class
-        # self.compute_loss = ComputeLoss(self.model)  # init losses class
-        self.logger.info(f'{colorstr("bright_green", "Image sizes")}: TRAIN [{self.config["img_size"][0]}] , '
+        self.logger.info(f'{colorstr("bright_green", "Image sizes (square)")}: TRAIN [{self.config["img_size"][0]}] , '
                          f'TEST [{self.config["img_size"][1]}]\t'
+                         f'{colorstr("bright_green", "Batch size")}: {self.config["batch_size"]} '
+                         f'({self.config["nominal_batch_size"]} nominal)\t'
                          f'{colorstr("bright_green", "Dataloader workers")}: {train_dataloader.num_workers}\t'
                          f'{colorstr("bright_green", "Saving results to")}: {save_dir}\n'
                          f'{" " * 31}{colorstr("bright_green", "Starting training for")} '
@@ -209,12 +173,12 @@ class Trainer:
 
             # --- Scheduler ---
             self.scheduler.step()
-            # mAP
-            # self.exponential_moving_average.update_attr(self.model,
-            # include=['yaml', 'nc', 'hyp', 'gr', 'names', 'stride', 'class_weights'])
+            # self.exponential_moving_average.update_attr(self.model, include=[.....])
             is_final_epoch: bool = epoch + 1 == self.config["epochs"]
-            # TODO: test?
-
+            if (not self.config["notest"] or is_final_epoch) and test_dataloader:  # Calculate mAP
+                self.test(test_dataloader)
+            if is_final_epoch and not test_dataloader:
+                self.logger.info("Test dataset was not given: skipping test...")
             # --- Write results ---
             with open(results_file, 'a') as ckpt:
                 ckpt.write(progress_description + '%10.4g' * 7 % results + '\n')  # append metrics, val_loss
@@ -239,7 +203,31 @@ class Trainer:
         torch.cuda.empty_cache()
         return results
 
-    def __start_or_resume_config(self):
+    def test(self, test_dataloader: torch.utils.data.DataLoader):
+        # TODO: WIP
+        # --- Disable training ---
+        self.model.eval()
+        # --- Console logging ---
+        batch_number: int = len(test_dataloader)
+        progress_bar = tqdm(enumerate(test_dataloader), total=batch_number)
+        rolling_acc: float = 0
+        for idx, (imgs, targets) in progress_bar:
+            imgs = imgs.to(self.device, non_blocking=True)
+            targets = targets.to(self.device)
+            with torch.no_grad():
+                preds = self.model(imgs)
+                acc = torchmetrics.functional.accuracy(preds, targets, task="multiclass", num_classes=10)
+                rolling_acc += acc
+                s = (
+                    f"{colorstr('bold', 'cyan', '[TEST]')}"
+                    f"\t{colorstr('bold', 'cyan', 'Batch Acc')}: {acc/self.config['batch_size']:.3f}"
+                    # f"\t{colorstr('bold', 'cyan', 'Rolling Acc')}: {rolling_acc/(idx+1):.3f}"
+                )
+                progress_bar.set_description(s)
+
+        self.logger.info(f"Final metrics: Acc: {rolling_acc/batch_number:.3f}")
+
+    def __start_or_resume_config(self) -> None:
         # --- Resume if a training had already started ---
         if self.config["resume"]:
             # Specified or most recent path
@@ -258,6 +246,7 @@ class Trainer:
             # Check files exist. The return is either the same path (if it was correct)
             # Or an updated path if it was found (uniquely) in the path's subdirectories
             self.config["data"] = check_file_exists(self.config["data"])
+            # Either check for configuration or pick default
             if not self.config["architecture_config"] == "default":
                 self.config["architecture_config"] = check_file_exists(self.config["architecture_config"])
             self.config["hyperparameters"] = check_file_exists(self.config["hyperparameters"])
@@ -440,9 +429,16 @@ def main():
     with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
         hyp = yaml.safe_load(f)
 
-    train = torch.utils.data.DataLoader(MNISTDataset())
+    train = torch.utils.data.DataLoader(MNISTDataset(train=True),
+                                        batch_size=config["batch_size"],
+                                        shuffle=True,
+                                        num_workers=config["workers"])
+    test = torch.utils.data.DataLoader(MNISTDataset(train=False),
+                                       batch_size=config["batch_size"],
+                                       shuffle=True,
+                                       num_workers=config["workers"])
     trainer = Trainer(CNN, config=config, hyperparameters=hyp, logger=logger)
-    trainer.train(train)
+    trainer.train(train, test)
 
 
 if __name__ == "__main__":
