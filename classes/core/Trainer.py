@@ -43,6 +43,7 @@ class Trainer:
         self.config: dict = config
         self.hyperparameters: dict = hyperparameters
         self.logger: logging.Logger = logger
+        self.__setup_logger()
         # --- Training stuff ---
         self.optimizer: Optional[torch.optim.Optimizer] = None
         self.gradient_scaler: Optional[amp.GradScaler] = None
@@ -56,6 +57,17 @@ class Trainer:
         self.model_class: Type[nn.Module] = model_class
         self.model: Optional[nn.Module] = None
         self.checkpoint = None
+
+    def __setup_logger(self):
+        self.logger.setLevel(self.config["logger"])
+        ch = logging.StreamHandler()
+        ch.setLevel(self.config["logger"])
+        formatter = colorlog.ColoredFormatter(
+            "%(log_color)s[%(asctime)s] - %(levelname)s - %(white)s%(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+        ch.setFormatter(formatter)
+        self.logger.addHandler(ch)
 
     def train(self, train_dataloader: torch.utils.data.DataLoader, test_dataloader: torch.utils.data.DataLoader = None):
         # --- Directories, initialize where things are saved ---
@@ -89,14 +101,15 @@ class Trainer:
         results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
         self.scheduler.last_epoch = start_epoch - 1  # do not move
         self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
-        self.logger.info(f'{colorstr("bright_green", "Image sizes (square)")}: TRAIN [{self.config["img_size"][0]}] , '
-                         f'TEST [{self.config["img_size"][1]}]\t'
-                         f'{colorstr("bright_green", "Batch size")}: {self.config["batch_size"]} '
-                         f'({self.config["nominal_batch_size"]} nominal)\t'
-                         f'{colorstr("bright_green", "Dataloader workers")}: {train_dataloader.num_workers}\t'
-                         f'{colorstr("bright_green", "Saving results to")}: {save_dir}\n'
-                         f'{" " * 31}{colorstr("bright_green", "Starting training for")} '
-                         f'{self.config["epochs"]} epochs...')
+        self.logger.info(
+            # f'{colorstr("bright_green", "Image sizes (square)")}: TRAIN [{self.config["img_size"][0]}], '
+            # f'TEST [{self.config["img_size"][1]}]\t'
+            f'{colorstr("bright_green", "Batch size")}: {self.config["batch_size"]} '
+            f'({self.config["nominal_batch_size"]} nominal)\t'
+            f'{colorstr("bright_green", "Dataloader workers")}: {train_dataloader.num_workers}\t'
+            f'{colorstr("bright_green", "Saving results to")}: {save_dir}\n'
+            f'{" " * 31}{colorstr("bright_green", "Starting training for")} '
+            f'{self.config["epochs"]} epochs...')
 
         torch.save(self.model, weights_dir / 'init.pt')
         epoch: int = -1
@@ -147,11 +160,11 @@ class Trainer:
         progress_bar = tqdm(enumerate(test_dataloader), total=batch_number)
         rolling_acc: float = 0.0
         rolling_f1: float = 0.0
-        for idx, (imgs, targets) in progress_bar:
-            imgs = imgs.to(self.device, non_blocking=True)
+        for idx, (inputs, targets) in progress_bar:
+            inputs = inputs.to(self.device, non_blocking=True)
             targets = targets.to(self.device)
             with torch.no_grad():
-                preds = self.model(imgs)
+                preds = self.model(inputs)
                 acc = torchmetrics.functional.accuracy(preds, targets, task="multiclass",
                                                        num_classes=preds.shape[-1])
                 f1 = torchmetrics.functional.f1_score(preds, targets, task="multiclass",
@@ -159,18 +172,21 @@ class Trainer:
                 rolling_acc += acc
                 rolling_f1 += f1
                 s = (
-                    f"{colorstr('bold', 'magenta', '[TEST]')}"
+                    f"{colorstr('bold', 'white', '[TEST]')}"
                     f"\t{colorstr('bold', 'magenta', 'Acc')}: "
                     f"{rolling_acc / (idx + 1):.3f}"
                     f"\t{colorstr('bold', 'magenta', 'F1')}: "
                     f"{rolling_f1 / (idx + 1):.3f}"
                 )
                 progress_bar.set_description(s)
-
-        self.logger.info(f"[Final metrics] "
+        current_lr: float = self.optimizer.param_groups[0]['lr']
+        self.logger.info(f"{colorstr('bold', 'white', '[Metrics]')} "
                          f"{colorstr('bold', 'yellow', 'Acc')}: {rolling_acc / batch_number:.3f} "
-                         f"{colorstr('bold', 'yellow', 'F1')} : {rolling_f1 / batch_number:.3f}")
-        print(f"{'-' * 100}")
+                         f"{colorstr('bold', 'yellow', 'F1')} : {rolling_f1 / batch_number:.3f}"
+                         f"\t{colorstr('bold', 'white', '[Parameters]')} "
+                         f"{colorstr('bold', 'yellow', 'Current lr')} : {current_lr:.3f} "
+                         f"(-{self.optimizer.defaults['lr'] - current_lr:.3f})")
+        self.logger.info(f"{'-' * 100}")
 
     def __train_one_epoch(self, train_dataloader: torch.utils.data.DataLoader, epoch: int):
         # --- Enable training ---
@@ -184,12 +200,12 @@ class Trainer:
 
         # Number of warmup iterations, max(config epochs (e.g., 3), 1k iterations)
         warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)
-        for idx, (imgs, targets) in progress_bar:
+        for idx, (inputs, targets) in progress_bar:
 
-            imgs, n_integrated_batches = self.__warmup_batch(imgs, batch_number, epoch, idx, warmup_number)
+            inputs, n_integrated_batches = self.__warmup_batch(inputs, batch_number, epoch, idx, warmup_number)
             with amp.autocast(enabled=self.device.type[:4] == "cuda"):
                 # --- Forward pass ---
-                preds = self.model(imgs)
+                preds = self.model(inputs)
                 loss = self.criterion(preds, targets.to(self.config["device"]))
 
                 # --- Backward ---
@@ -209,21 +225,21 @@ class Trainer:
                 mem: str = f'{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2g}G'
                 max_mem: float = torch.cuda.get_device_properties(self.device.index).total_memory
                 total_mem: str = f"{(max_mem / 1E9) if torch.cuda.is_available() else 0:.2g}G"
-                s = (f"{colorstr('bold', 'magenta', '[TRAIN]')}"
+                s = (f"{colorstr('bold', 'white', '[TRAIN]')}"
                      f"\t{colorstr('bold', 'magenta', 'Epoch')}: {epoch}/{self.config['epochs'] - 1}"
-                     f"\t{colorstr('bold', 'magenta', 'gpu_mem')}: {mem}/{total_mem}"
-                     f"\t{colorstr('bold', 'magenta', 'loss')}: {loss:.4f}"
-                     f"\t{colorstr('bold', 'magenta', 'img_size')}: {imgs.shape[-2]}x{imgs.shape[-1]}"
+                     f"\t{colorstr('bold', 'magenta', 'Gpu_mem')}: {mem}/{total_mem}"
+                     f"\t{colorstr('bold', 'magenta', f'{str(self.criterion)[:-2]}')}: {loss:.4f}"
+                     # f"\t{colorstr('bold', 'magenta', 'img_size')}: {imgs.shape[-2]}x{imgs.shape[-1]}"
                      )
                 progress_bar.set_description(s)
 
         return epoch_description
 
-    def __warmup_batch(self, imgs: torch.Tensor, batch_number: int,
+    def __warmup_batch(self, inputs: torch.Tensor, batch_number: int,
                        epoch: int, i: int, warmup_number: int) -> [torch.Tensor, int]:
 
         n_integrated_batches: int = i + batch_number * epoch  # number integrated batches (since train start)
-        imgs = imgs.to(self.device, non_blocking=True).float() / 255.0  # uint8 to float32, 0-255 to 0.0-1.0
+        inputs = inputs.to(self.device, non_blocking=True).float() / 255.0  # uint8 to float32, 0-255 to 0.0-1.0
         if n_integrated_batches <= warmup_number:
             x_interpolated = [0, warmup_number]
             self.accumulate = max(1, np.interp(n_integrated_batches, x_interpolated,
@@ -238,7 +254,7 @@ class Trainer:
                     x['momentum'] = np.interp(n_integrated_batches, x_interpolated,
                                               [self.hyperparameters['warmup_momentum'],
                                                self.hyperparameters['momentum']])
-        return imgs, n_integrated_batches
+        return inputs, n_integrated_batches
 
     def __start_or_resume_config(self) -> None:
         # --- Resume if a training had already started ---
@@ -395,15 +411,6 @@ class Trainer:
 
 def main():
     logger = logging.getLogger(__name__)
-    logger.setLevel("INFO")
-    ch = logging.StreamHandler()
-    ch.setLevel("INFO")
-    formatter = colorlog.ColoredFormatter(
-        "%(log_color)s[%(asctime)s] - %(levelname)s - %(white)s%(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
 
     with open('config/training/training_configuration.yaml', 'r') as f:
         config = yaml.safe_load(f)

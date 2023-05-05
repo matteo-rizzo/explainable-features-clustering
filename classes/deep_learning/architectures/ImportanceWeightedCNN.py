@@ -36,8 +36,10 @@ def main():
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     model = ImportanceWeightedCNN(logger=logger)
+    print(model)
     image = torch.zeros(1, 3, 32, 32)
-
+    for name, param in model.named_parameters():
+        print(f"{name}: {param.shape}")
     # print(image)
     # print(model.forward(image))
     # print(model)
