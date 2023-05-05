@@ -16,7 +16,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from classes.MNISTDataset import MNISTDataset
-from classes.deep_learning.architectures.CNN import CNN
+from classes.deep_learning.architectures.ImportanceWeightedCNN import ImportanceWeightedCNN
 from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from classes.factories.OptimizerFactory import OptimizerFactory
@@ -25,6 +25,9 @@ from functional.setup import get_device
 from functional.torch_utils import strip_optimizer
 from functional.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run, colorstr
 
+
+# TODO - LIST
+# - Early stopping
 
 def fitness(x):
     # FIXME: to change
@@ -54,7 +57,122 @@ class Trainer:
         self.model: Optional[nn.Module] = None
         self.checkpoint = None
 
-    def train_one_epoch(self, train_dataloader: torch.utils.data.DataLoader, epoch: int):
+    def train(self, train_dataloader: torch.utils.data.DataLoader, test_dataloader: torch.utils.data.DataLoader = None):
+        # --- Directories, initialize where things are saved ---
+        self.__start_or_resume_config()
+        save_dir, weights_dir, last_ckpt, best_ckpt, results_file = self.__init_dump_folder()
+
+        # --- Model ---
+        pretrained: bool = self.config["weights"].endswith('.pt')
+        self.__setup_model(pretrained=pretrained)
+        self.__print_model()
+        # --- Gradient accumulation ---
+        self.accumulate: int = self.__setup_gradient_accumulation()
+
+        # --- Optimization ---
+        self.optimizer: torch.optim.Optimizer = self.__setup_optimizer()
+        self.criterion: torch.nn.modules.loss = self.__setup_criterion()
+        # TODO: make optional / modularize
+        self.scheduler: torch.optim.lr_scheduler = self.__setup_scheduler()
+
+        # --- Exponential moving average ---
+        # self.exponential_moving_average = ExponentialMovingAverageModel(self.model)
+
+        # --- Resume pretrained if necessary ---
+        if pretrained:
+            start_epoch, best_fitness = self.__resume_pretrained(results_file=results_file)
+            self.checkpoint = None
+        else:
+            start_epoch, best_fitness = 0, 0.0
+
+        # TODO: change
+        results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
+        self.scheduler.last_epoch = start_epoch - 1  # do not move
+        self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
+        self.logger.info(f'{colorstr("bright_green", "Image sizes (square)")}: TRAIN [{self.config["img_size"][0]}] , '
+                         f'TEST [{self.config["img_size"][1]}]\t'
+                         f'{colorstr("bright_green", "Batch size")}: {self.config["batch_size"]} '
+                         f'({self.config["nominal_batch_size"]} nominal)\t'
+                         f'{colorstr("bright_green", "Dataloader workers")}: {train_dataloader.num_workers}\t'
+                         f'{colorstr("bright_green", "Saving results to")}: {save_dir}\n'
+                         f'{" " * 31}{colorstr("bright_green", "Starting training for")} '
+                         f'{self.config["epochs"]} epochs...')
+
+        torch.save(self.model, weights_dir / 'init.pt')
+        epoch: int = -1
+        t0 = time.time()
+        # Start training ------------------------------------------------------------------------
+        for epoch in range(start_epoch, self.config["epochs"]):
+            # --- Forward, backward, optimization ---
+            progress_description: str = self.__train_one_epoch(train_dataloader=train_dataloader, epoch=epoch)
+
+            # --- Scheduler ---
+            self.scheduler.step()
+            # self.exponential_moving_average.update_attr(self.model, include=[.....])
+            is_final_epoch: bool = epoch + 1 == self.config["epochs"]
+            if (not self.config["notest"] or is_final_epoch) and test_dataloader:  # Calculate mAP
+                self.test(test_dataloader)
+            if is_final_epoch and not test_dataloader:
+                self.logger.info("Test dataset was not given: skipping test...")
+            # --- Write results ---
+            with open(results_file, 'a') as ckpt:
+                ckpt.write(progress_description + '%10.4g' * 7 % results + '\n')  # append metrics, val_loss
+
+            # weighted combination of metrics
+            fitness_value = fitness(np.array(results).reshape(1, -1))
+            if fitness_value > best_fitness:
+                best_fitness = fitness_value
+
+            # Save model
+            if (not self.config["nosave"]) or is_final_epoch:
+                self.__save_model(best_fitness, epoch, fitness_value, best_ckpt, last_ckpt, results_file, weights_dir)
+                self.checkpoint = None
+        # End training --------------------------------------------------------------------------
+
+        self.logger.info(f'{epoch - start_epoch + 1:g} epochs completed in {(time.time() - t0) / 3600:.3f} hours.\n')
+
+        # --- Strip optimizers ---
+        for ckpt in last_ckpt, best_ckpt:
+            if ckpt.exists():
+                strip_optimizer(ckpt)
+        torch.cuda.empty_cache()
+        return results
+
+    def test(self, test_dataloader: torch.utils.data.DataLoader):
+        # TODO: WIP
+        # --- Disable training ---
+        self.model.eval()
+        # --- Console logging ---
+        batch_number: int = len(test_dataloader)
+        progress_bar = tqdm(enumerate(test_dataloader), total=batch_number)
+        rolling_acc: float = 0.0
+        rolling_f1: float = 0.0
+        for idx, (imgs, targets) in progress_bar:
+            imgs = imgs.to(self.device, non_blocking=True)
+            targets = targets.to(self.device)
+            with torch.no_grad():
+                preds = self.model(imgs)
+                acc = torchmetrics.functional.accuracy(preds, targets, task="multiclass",
+                                                       num_classes=preds.shape[-1])
+                f1 = torchmetrics.functional.f1_score(preds, targets, task="multiclass",
+                                                      num_classes=preds.shape[-1])
+                rolling_acc += acc
+                rolling_f1 += f1
+                s = (
+                    f"{colorstr('bold', 'magenta', '[TEST]')}"
+                    f"\t{colorstr('bold', 'magenta', 'Acc')}: "
+                    f"{rolling_acc / (idx + 1):.3f}"
+                    f"\t{colorstr('bold', 'magenta', 'F1')}: "
+                    f"{rolling_f1 / (idx + 1):.3f}"
+                )
+                progress_bar.set_description(s)
+
+        self.logger.info(f"[Final metrics] "
+                         f"{colorstr('bold', 'yellow', 'Acc')}: {rolling_acc / batch_number:.3f} "
+                         f"{colorstr('bold', 'yellow', 'F1')} : {rolling_f1 / batch_number:.3f}")
+        print(f"{'-' * 100}")
+
+    def __train_one_epoch(self, train_dataloader: torch.utils.data.DataLoader, epoch: int):
         # --- Enable training ---
         self.model.train()
         # --- Console logging ---
@@ -121,111 +239,6 @@ class Trainer:
                                               [self.hyperparameters['warmup_momentum'],
                                                self.hyperparameters['momentum']])
         return imgs, n_integrated_batches
-
-    def train(self, train_dataloader: torch.utils.data.DataLoader, test_dataloader: torch.utils.data.DataLoader = None):
-        # --- Directories, initialize where things are saved ---
-        self.__start_or_resume_config()
-        save_dir, weights_dir, last_ckpt, best_ckpt, results_file = self.__init_dump_folder()
-
-        # --- Model ---
-        pretrained: bool = self.config["weights"].endswith('.pt')
-        self.__setup_model(pretrained=pretrained)
-        self.__print_model()
-        # --- Gradient accumulation ---
-        self.accumulate: int = self.__setup_gradient_accumulation()
-
-        # --- Optimization ---
-        self.optimizer: torch.optim.Optimizer = self.__setup_optimizer()
-        self.criterion: torch.nn.modules.loss = self.__setup_criterion()
-        # TODO: make optional / modularize
-        self.scheduler: torch.optim.lr_scheduler = self.__setup_scheduler()
-
-        # --- Exponential moving average ---
-        # self.exponential_moving_average = ExponentialMovingAverageModel(self.model)
-
-        # --- Resume pretrained if necessary ---
-        if pretrained:
-            start_epoch, best_fitness = self.__resume_pretrained(results_file=results_file)
-            self.checkpoint = None
-        else:
-            start_epoch, best_fitness = 0, 0.0
-
-        # TODO: change
-        results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
-        self.scheduler.last_epoch = start_epoch - 1  # do not move
-        self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
-        self.logger.info(f'{colorstr("bright_green", "Image sizes (square)")}: TRAIN [{self.config["img_size"][0]}] , '
-                         f'TEST [{self.config["img_size"][1]}]\t'
-                         f'{colorstr("bright_green", "Batch size")}: {self.config["batch_size"]} '
-                         f'({self.config["nominal_batch_size"]} nominal)\t'
-                         f'{colorstr("bright_green", "Dataloader workers")}: {train_dataloader.num_workers}\t'
-                         f'{colorstr("bright_green", "Saving results to")}: {save_dir}\n'
-                         f'{" " * 31}{colorstr("bright_green", "Starting training for")} '
-                         f'{self.config["epochs"]} epochs...')
-
-        torch.save(self.model, weights_dir / 'init.pt')
-        epoch: int = -1
-        t0 = time.time()
-        # Start training ------------------------------------------------------------------------
-        for epoch in range(start_epoch, self.config["epochs"]):
-            # --- Forward, backward, optimization ---
-            progress_description: str = self.train_one_epoch(train_dataloader=train_dataloader, epoch=epoch)
-
-            # --- Scheduler ---
-            self.scheduler.step()
-            # self.exponential_moving_average.update_attr(self.model, include=[.....])
-            is_final_epoch: bool = epoch + 1 == self.config["epochs"]
-            if (not self.config["notest"] or is_final_epoch) and test_dataloader:  # Calculate mAP
-                self.test(test_dataloader)
-            if is_final_epoch and not test_dataloader:
-                self.logger.info("Test dataset was not given: skipping test...")
-            # --- Write results ---
-            with open(results_file, 'a') as ckpt:
-                ckpt.write(progress_description + '%10.4g' * 7 % results + '\n')  # append metrics, val_loss
-
-            # weighted combination of metrics
-            fitness_value = fitness(np.array(results).reshape(1, -1))
-            if fitness_value > best_fitness:
-                best_fitness = fitness_value
-
-            # Save model
-            if (not self.config["nosave"]) or is_final_epoch:
-                self.__save_model(best_fitness, epoch, fitness_value, best_ckpt, last_ckpt, results_file, weights_dir)
-                self.checkpoint = None
-        # End training --------------------------------------------------------------------------
-
-        self.logger.info(f'{epoch - start_epoch + 1:g} epochs completed in {(time.time() - t0) / 3600:.3f} hours.\n')
-
-        # --- Strip optimizers ---
-        for ckpt in last_ckpt, best_ckpt:
-            if ckpt.exists():
-                strip_optimizer(ckpt)
-        torch.cuda.empty_cache()
-        return results
-
-    def test(self, test_dataloader: torch.utils.data.DataLoader):
-        # TODO: WIP
-        # --- Disable training ---
-        self.model.eval()
-        # --- Console logging ---
-        batch_number: int = len(test_dataloader)
-        progress_bar = tqdm(enumerate(test_dataloader), total=batch_number)
-        rolling_acc: float = 0
-        for idx, (imgs, targets) in progress_bar:
-            imgs = imgs.to(self.device, non_blocking=True)
-            targets = targets.to(self.device)
-            with torch.no_grad():
-                preds = self.model(imgs)
-                acc = torchmetrics.functional.accuracy(preds, targets, task="multiclass", num_classes=10)
-                rolling_acc += acc
-                s = (
-                    f"{colorstr('bold', 'cyan', '[TEST]')}"
-                    f"\t{colorstr('bold', 'cyan', 'Batch Acc')}: {acc/self.config['batch_size']:.3f}"
-                    # f"\t{colorstr('bold', 'cyan', 'Rolling Acc')}: {rolling_acc/(idx+1):.3f}"
-                )
-                progress_bar.set_description(s)
-
-        self.logger.info(f"Final metrics: Acc: {rolling_acc/batch_number:.3f}")
 
     def __start_or_resume_config(self) -> None:
         # --- Resume if a training had already started ---
@@ -378,38 +391,6 @@ class Trainer:
             arguments = str(module)[len(module_type.split(".")[-1]):]
             self.logger.info(f'{idx:>3}{parameters:10.0f}  {module_type:<40}{arguments}')
         self.logger.info(f'{"-" * 95}')
-    # def __early_stopping_check(self, metric_value: float) -> bool:
-    #     pass
-    #     # """
-    #     # Decides whether to early stop the train based on the early stopping conditions
-    #     # @param metric_value: the monitored val metrics (e.g. auc, loss)
-    #     # @return: a flag indicating whether the training should be early stopped
-    #     # """
-    #     # if self.__es_metric_trend == "increasing":
-    #     #     metrics_check = metric_value > self.__es_metric_best_value
-    #     # else:
-    #     #     metrics_check = metric_value < self.__es_metric_best_value
-    #     #
-    #     # if metrics_check:
-    #     #     print(f"\n\t Old best val {self.__es_metric}: {self.__es_metric_best_value:.4f} "
-    #     #           f"| New best {self.__es_metric}: {metric_value:.4f}\n")
-    #     #
-    #     #     print("\t Saving new best model...")
-    #     #     self.model.save(self.__path_to_best_model)
-    #     #     print("\t -> New best model saved!")
-    #     #
-    #     #     self.__es_metric_best_value = metric_value
-    #     #     self.__epochs_no_improvement = 0
-    #     # else:
-    #     #     self.__epochs_no_improvement += 1
-    #     #     if self.__epochs_no_improvement == self.__patience:
-    #     #         print(f" ** No decrease in val {self.__es_metric} "
-    #     #               f"for {self.__patience} evaluations. Early stopping! ** ")
-    #     #         return True
-    #     #
-    #     # print(" Epochs without improvement: ", self.__epochs_no_improvement)
-    #     # print(" ........................................................... ")
-    #     # return False
 
 
 def main():
@@ -437,7 +418,7 @@ def main():
                                        batch_size=config["batch_size"],
                                        shuffle=True,
                                        num_workers=config["workers"])
-    trainer = Trainer(CNN, config=config, hyperparameters=hyp, logger=logger)
+    trainer = Trainer(ImportanceWeightedCNN, config=config, hyperparameters=hyp, logger=logger)
     trainer.train(train, test)
 
 
