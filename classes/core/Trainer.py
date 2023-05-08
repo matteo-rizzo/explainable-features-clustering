@@ -13,6 +13,7 @@ import torchmetrics
 import yaml
 from torch.cuda import amp
 from torch.utils.data import Dataset
+from torchmetrics import MetricCollection
 from tqdm import tqdm
 
 from classes.MNISTDataset import MNISTDataset
@@ -29,21 +30,27 @@ from functional.utils import intersect_dicts, increment_path, check_file_exists,
 # TODO - LIST
 # - Early stopping
 
-def fitness(x):
-    # FIXME: to change
+def fitness(x: np.ndarray) -> float:
+    # TODO: for now just unweighted sum of metrics
     # IDEA: could change these weights
     # Model fitness as a weighted combination of metrics
-    w = [0.0, 0.0, 0.1, 0.9]  # weights for [P, R, mAP@0.5, mAP@0.5:0.95]
-    return (x[:, :4] * w).sum(1)
+    # w = [0.0, 0.0, 0.1, 0.9]  # weights
+    # return (x[:, :4] * w).sum(1)
+    return x.sum(axis=1)
 
 
 class Trainer:
 
-    def __init__(self, model_class: Type[nn.Module], config: dict, hyperparameters: dict, logger: logging.Logger):
+    def __init__(self, model_class: Type[nn.Module],
+                 config: dict,
+                 hyperparameters: dict,
+                 metric_collection: MetricCollection,
+                 logger: logging.Logger = logging.getLogger(__name__)):
         self.config: dict = config
         self.hyperparameters: dict = hyperparameters
         self.logger: logging.Logger = logger
         self.__setup_logger()
+        self.device: Optional[torch.device] = get_device(config["device"])
         # --- Training stuff ---
         self.optimizer: Optional[torch.optim.Optimizer] = None
         self.gradient_scaler: Optional[amp.GradScaler] = None
@@ -51,9 +58,9 @@ class Trainer:
         self.lr_schedule_fn: Optional[Callable] = None  # Scheduling function
         self.scheduler: torch.optim.lr_scheduler = None  # Torch scheduler
         self.criterion: torch.nn.modules.loss = None  # Loss
+        self.metrics: MetricCollection = metric_collection.to(self.device)  # Metrics
         self.accumulate: int = -1
         # ---
-        self.device: Optional[torch.device] = get_device(config["device"])
         self.model_class: Type[nn.Module] = model_class
         self.model: Optional[nn.Module] = None
         self.checkpoint = None
@@ -97,13 +104,10 @@ class Trainer:
         else:
             start_epoch, best_fitness = 0, 0.0
 
-        # TODO: change
-        results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
+        results = (0,) * len(self.metrics)
         self.scheduler.last_epoch = start_epoch - 1  # do not move
         self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
         self.logger.info(
-            # f'{colorstr("bright_green", "Image sizes (square)")}: TRAIN [{self.config["img_size"][0]}], '
-            # f'TEST [{self.config["img_size"][1]}]\t'
             f'{colorstr("bright_green", "Batch size")}: {self.config["batch_size"]} '
             f'({self.config["nominal_batch_size"]} nominal)\t'
             f'{colorstr("bright_green", "Dataloader workers")}: {train_dataloader.num_workers}\t'
@@ -124,12 +128,13 @@ class Trainer:
             # self.exponential_moving_average.update_attr(self.model, include=[.....])
             is_final_epoch: bool = epoch + 1 == self.config["epochs"]
             if (not self.config["notest"] or is_final_epoch) and test_dataloader:  # Calculate mAP
-                self.test(test_dataloader)
+                results = self.test(test_dataloader)
             if is_final_epoch and not test_dataloader:
                 self.logger.info("Test dataset was not given: skipping test...")
             # --- Write results ---
             with open(results_file, 'a') as ckpt:
-                ckpt.write(progress_description + '%10.4g' * 7 % results + '\n')  # append metrics, val_loss
+                ckpt.write(
+                    progress_description + '%10.4g' * len(self.metrics) % tuple(results) + '\n')  # append metrics
 
             # weighted combination of metrics
             fitness_value = fitness(np.array(results).reshape(1, -1))
@@ -152,41 +157,39 @@ class Trainer:
         return results
 
     def test(self, test_dataloader: torch.utils.data.DataLoader):
-        # TODO: WIP
         # --- Disable training ---
         self.model.eval()
         # --- Console logging ---
         batch_number: int = len(test_dataloader)
         progress_bar = tqdm(enumerate(test_dataloader), total=batch_number)
-        rolling_acc: float = 0.0
-        rolling_f1: float = 0.0
+        rolling_metrics = [torch.tensor(0.0, device=self.device), ] * len(self.metrics)
+        # --------------------------------------------------
         for idx, (inputs, targets) in progress_bar:
             inputs = inputs.to(self.device, non_blocking=True)
             targets = targets.to(self.device)
             with torch.no_grad():
                 preds = self.model(inputs)
-                acc = torchmetrics.functional.accuracy(preds, targets, task="multiclass",
-                                                       num_classes=preds.shape[-1])
-                f1 = torchmetrics.functional.f1_score(preds, targets, task="multiclass",
-                                                      num_classes=preds.shape[-1])
-                rolling_acc += acc
-                rolling_f1 += f1
-                s = (
-                    f"{colorstr('bold', 'white', '[TEST]')}"
-                    f"\t{colorstr('bold', 'magenta', 'Acc')}: "
-                    f"{rolling_acc / (idx + 1):.3f}"
-                    f"\t{colorstr('bold', 'magenta', 'F1')}: "
-                    f"{rolling_f1 / (idx + 1):.3f}"
-                )
-                progress_bar.set_description(s)
+                result_dict = self.metrics(preds, targets)
+                rolling_metrics = [x + y for x, y in zip(rolling_metrics, result_dict.values())]
+                batch_desc = f"{colorstr('bold', 'white', '[TEST]')}\t"
+                for metric_name, metric_value in zip(result_dict.keys(), rolling_metrics):
+                    batch_desc += f"{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
+                                  f"{metric_value / (idx + 1):.3f}\t"
+                progress_bar.set_description(batch_desc)
+        # --------------------------------------------------
         current_lr: float = self.optimizer.param_groups[0]['lr']
-        self.logger.info(f"{colorstr('bold', 'white', '[Metrics]')} "
-                         f"{colorstr('bold', 'yellow', 'Acc')}: {rolling_acc / batch_number:.3f} "
-                         f"{colorstr('bold', 'yellow', 'F1')} : {rolling_f1 / batch_number:.3f}"
-                         f"\t{colorstr('bold', 'white', '[Parameters]')} "
-                         f"{colorstr('bold', 'yellow', 'Current lr')} : {current_lr:.3f} "
-                         f"(-{self.optimizer.defaults['lr'] - current_lr:.3f})")
+        epoch_desc = f"{colorstr('bold', 'white', '[Metrics]')} "
+        for metric_name, metric_value in zip(result_dict.keys(), rolling_metrics):
+            epoch_desc += f"\t{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
+                          f"{metric_value / batch_number :.3f}"
+        epoch_desc += (f"\t{colorstr('bold', 'white', '[Parameters]')} "
+                       f"{colorstr('bold', 'yellow', 'Current lr')} : {current_lr:.3f} "
+                       f"(-{self.optimizer.defaults['lr'] - current_lr:.3f})")
+        # --------------------------------------------------
+        self.logger.info(epoch_desc)
         self.logger.info(f"{'-' * 100}")
+        results = [m.cpu().item() / batch_number for m in rolling_metrics]
+        return results
 
     def __train_one_epoch(self, train_dataloader: torch.utils.data.DataLoader, epoch: int):
         # --- Enable training ---
@@ -425,7 +428,15 @@ def main():
                                        batch_size=config["batch_size"],
                                        shuffle=True,
                                        num_workers=config["workers"])
-    trainer = Trainer(ImportanceWeightedCNN, config=config, hyperparameters=hyp, logger=logger)
+
+    metric_collection = MetricCollection({
+        'accuracy': torchmetrics.Accuracy(task="multiclass", num_classes=10),
+        'precision': torchmetrics.Precision(task="multiclass", num_classes=10),
+        'recall': torchmetrics.Recall(task="multiclass", num_classes=10)
+    })
+
+    trainer = Trainer(ImportanceWeightedCNN, config=config, hyperparameters=hyp,
+                      metric_collection=metric_collection, logger=logger)
     trainer.train(train, test)
 
 
