@@ -209,7 +209,7 @@ class Trainer:
             with amp.autocast(enabled=self.device.type[:4] == "cuda"):
                 # --- Forward pass ---
                 preds = self.model(inputs)
-                loss = self.criterion(preds, targets.to(self.config["device"]))
+                loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
 
                 # --- Backward ---
                 self.gradient_scaler.scale(loss).backward()
@@ -237,6 +237,11 @@ class Trainer:
                 progress_bar.set_description(s)
 
         return epoch_description
+
+    def __calculate_loss(self, preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        # TODO: possibly add other parameters
+        loss = self.criterion(preds, targets.to(self.config["device"]))
+        return loss
 
     def __warmup_batch(self, inputs: torch.Tensor, batch_number: int,
                        epoch: int, i: int, warmup_number: int) -> [torch.Tensor, int]:
@@ -431,8 +436,9 @@ def main():
 
     metric_collection = MetricCollection({
         'accuracy': torchmetrics.Accuracy(task="multiclass", num_classes=10),
-        'precision': torchmetrics.Precision(task="multiclass", num_classes=10),
-        'recall': torchmetrics.Recall(task="multiclass", num_classes=10)
+        'precision': torchmetrics.Precision(task="multiclass", num_classes=10, average="macro"),
+        'recall': torchmetrics.Recall(task="multiclass", num_classes=10, average="macro"),
+        "F1": torchmetrics.F1Score(task="multiclass", num_classes=10, average="macro")
     })
 
     trainer = Trainer(ImportanceWeightedCNN, config=config, hyperparameters=hyp,
