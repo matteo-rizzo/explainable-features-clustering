@@ -1,5 +1,6 @@
 import logging
 
+import cv2
 import numpy as np
 import torchmetrics
 import yaml
@@ -32,16 +33,35 @@ def main():
 
     train_loader = DataLoader(MNISTDataset(train=True),
                               batch_size=config["batch_size"],
-                              shuffle=True,
+                              shuffle=False,
                               num_workers=config["workers"])
     test_loader = DataLoader(MNISTDataset(train=False),
                              batch_size=config["batch_size"],
-                             shuffle=True,
+                             shuffle=False,
                              num_workers=config["workers"])
     # -----------------------------------------------------------------------------------
-    key_points_extractor = SIFT()
-    descriptors = key_points_extractor.get_descriptors(train_loader)
+    key_points_extractor = SIFT(nOctaveLayers=4, contrastThreshold=0.01, edgeThreshold=20, sigma=1.2)
+    keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
 
+    for imgs, _ in train_loader:
+        for img in imgs:
+            img = (img.numpy().squeeze() * 255).astype(np.uint8)
+            kp, _ = key_points_extractor.run(img)
+            img_kp = cv2.drawKeypoints(img,
+                                       kp,
+                                       None,
+                                       flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
+            # Display image
+            cv2.namedWindow('SIFT Image', cv2.WINDOW_NORMAL)
+
+            # Display image
+            scale = 4  # Adjust this to change the size of the image
+            resized_img = cv2.resize(img_kp, (img_kp.shape[1] * scale, img_kp.shape[0] * scale))
+            cv2.imshow('SIFT Image', resized_img)
+            # cv2.imshow('SIFT Keypoints', img_kp)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
     # TODO HDBScan
     clustering = KMeansClustering()
 
@@ -49,32 +69,32 @@ def main():
     clusters = clustering.run(flat_descriptors)
     labels, centroids = clusters.labels_, clusters.cluster_centers_
 
-    clustering.plot_sample(flat_descriptors, centroids, labels, sample_size=400000)
-    ranking = clustering.rank_clusters(flat_descriptors, centroids, labels)
-
-    vocabulary = Vocabulary()
-    X, y = vocabulary.embed(ranking)
-    # -----------------------------------------------------------------------------------
-    svm = LinearSVC()
-    # train the machine learning model on the feature matrix and label vector
-    svm.fit(X, y)
-
-    # predict the labels of the training data
-    y_pred = svm.predict(X)
-
-    # evaluate the accuracy of the model
-    acc = accuracy_score(y, y_pred)
-
-    # compute the importance weights of the visual words using the learned coefficients
-    importance_weights = np.abs(svm.coef_).sum(axis=0)
-    # -----------------------------------------------------------------------------------
-    # match the visual words with the features using dot product weighted by importance weights
-    matches = Vocabulary.match(descriptors, importance_weights)
-    # -----------------------------------------------------------------------------------
-    trainer = Trainer(ImportanceWeightedCNN, config=config, hyperparameters=hyp,
-                      metric_collection=metric_collection, logger=logger)
-    trainer.train(train_dataloader=train_loader, test_dataloader=test_loader)
-    # -----------------------------------------------------------------------------------
+    # TODO FROM HERE ON ------
+    # clustering.plot_sample(flat_descriptors, centroids, labels, sample_size=400000)
+    # ranking = clustering.rank_clusters(flat_descriptors, centroids, labels)
+    # vocabulary = Vocabulary()
+    # X, y = vocabulary.embed(ranking)
+    # # -----------------------------------------------------------------------------------
+    # svm = LinearSVC()
+    # # train the machine learning model on the feature matrix and label vector
+    # svm.fit(X, y)
+    #
+    # # predict the labels of the training data
+    # y_pred = svm.predict(X)
+    #
+    # # evaluate the accuracy of the model
+    # acc = accuracy_score(y, y_pred)
+    #
+    # # compute the importance weights of the visual words using the learned coefficients
+    # importance_weights = np.abs(svm.coef_).sum(axis=0)
+    # # -----------------------------------------------------------------------------------
+    # # match the visual words with the features using dot product weighted by importance weights
+    # matches = Vocabulary.match(descriptors, importance_weights)
+    # # -----------------------------------------------------------------------------------
+    # trainer = Trainer(ImportanceWeightedCNN, config=config, hyperparameters=hyp,
+    #                   metric_collection=metric_collection, logger=logger)
+    # trainer.train(train_dataloader=train_loader, test_dataloader=test_loader)
+    # # -----------------------------------------------------------------------------------
 
 
 if __name__ == "__main__":
