@@ -4,17 +4,12 @@ import cv2
 import numpy as np
 import torchmetrics
 import yaml
-from sklearn.metrics import accuracy_score
-from sklearn.svm import LinearSVC
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
 
 from classes.Clustering import KMeansClustering
 from classes.MNISTDataset import MNISTDataset
 from classes.SIFT import SIFT
-from classes.Vocabulary import Vocabulary
-from classes.core.Trainer import Trainer
-from classes.deep_learning.architectures.ImportanceWeightedCNN import ImportanceWeightedCNN
 
 
 def main():
@@ -40,7 +35,12 @@ def main():
                              shuffle=False,
                              num_workers=config["workers"])
     # -----------------------------------------------------------------------------------
-    key_points_extractor = SIFT(nOctaveLayers=4, contrastThreshold=0.01, edgeThreshold=20, sigma=1.2)
+    # TODO: genetic algorithm to maximise these features?
+    key_points_extractor = SIFT(nfeatures=150,  # (default = 0 = all) Small images, few features
+                                nOctaveLayers=3,  # (default = 3) Default should be ok
+                                contrastThreshold=0.04,  # (default = 0.04) Lower = Include kps with lower contrast
+                                edgeThreshold=20,  # (default = 10) Higher = Include keypoints with lower edge response
+                                sigma=1.1)  # (default = 1.2) capture finer details in the images
     keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
 
     for imgs, _ in train_loader:
