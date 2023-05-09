@@ -5,7 +5,7 @@ from tqdm import tqdm
 from classes.Clustering import KMeansClustering
 from classes.MNISTDataset import MNISTDataset
 from classes.deep_learning.models.ModelImportanceWeightedCNN import ModelImportanceWeightedCNN
-from classes.SIFT import SIFT
+from classes.FeautureExtractingAlgorithm import FeautureExtractingAlgorithm
 from functional.setup import get_device
 
 DEVICE_TYPE = "cpu"
@@ -21,12 +21,12 @@ def main():
     test_loader = DataLoader(MNISTDataset(train=False),
                              batch_size=64, shuffle=False, num_workers=2)
 
-    sift = SIFT()
-    _, descriptors = sift.get_descriptors(train_loader)
+    sift = FeautureExtractingAlgorithm()
+    _, descriptors = sift.get_keypoints_and_descriptors(train_loader)
     flat_descriptors = np.concatenate(descriptors)
 
     clustering = KMeansClustering()
-    clusters = clustering.run(flat_descriptors)
+    clusters = clustering.fit(flat_descriptors)
     labels, centroids = clusters.labels_, clusters.cluster_centers_
     clustering.plot_sample(flat_descriptors, centroids, labels, sample_size=400000)
     ranking = clustering.rank_clusters(flat_descriptors, centroids, labels)

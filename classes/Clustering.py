@@ -10,13 +10,41 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from classes.MNISTDataset import MNISTDataset
-from classes.SIFT import SIFT
+from classes.FeautureExtractingAlgorithm import FeautureExtractingAlgorithm
 
 
 class KMeansClustering:
 
     def __init__(self, n_clusters: int = 10):
         self.__clustering = KMeans(n_clusters=n_clusters, n_init='auto', random_state=0)
+
+    def get_centroids(self):
+        return self.__clustering.cluster_centers_
+
+    def get_labels(self):
+        return self.__clustering.labels_
+
+    def fit(self, data: np.ndarray) -> sklearn.cluster:
+        return self.__clustering.fit(data)
+
+    def predict(self, data: np.ndarray) -> np.ndarray:
+        return self.__clustering.predict(data)
+
+    def fit_predict(self, data: np.ndarray) -> np.ndarray:
+        return self.__clustering.fit_predict(data)
+
+    @staticmethod
+    def rank_clusters(data: np.ndarray, centroids: np.ndarray, labels: List) -> List[Tuple]:
+        clusters_ranking = []
+        for i in tqdm(range(np.max(labels) + 1), desc="Ranking clusters"):
+            cluster_variance = np.var(data[labels == i], axis=0)
+            cluster_distance = np.linalg.norm(data[labels == i] - centroids[i], axis=1)
+            clusters_ranking.append((i, np.sum(cluster_variance) / np.sum(cluster_distance)))
+
+        for i, ranking in enumerate(clusters_ranking):
+            print(f"Cluster {i}: Importance Score = {ranking}")
+
+        return sorted(clusters_ranking, key=lambda x: x[1], reverse=True)
 
     @staticmethod
     def find_optimal_n_clusters(data: np.ndarray, start: int = 2, end: int = 100) -> int:
@@ -61,22 +89,6 @@ class KMeansClustering:
     def __get_color_map(n, name='hsv'):
         return plt.get_cmap(name, n)
 
-    def run(self, data: np.ndarray) -> sklearn.cluster:
-        return self.__clustering.fit(data)
-
-    @staticmethod
-    def rank_clusters(data: np.ndarray, centroids: np.ndarray, labels: List) -> List[Tuple]:
-        clusters_ranking = []
-        for i in tqdm(range(np.max(labels) + 1), desc="Ranking clusters"):
-            cluster_variance = np.var(data[labels == i], axis=0)
-            cluster_distance = np.linalg.norm(data[labels == i] - centroids[i], axis=1)
-            clusters_ranking.append((i, np.sum(cluster_variance) / np.sum(cluster_distance)))
-
-        for i, ranking in enumerate(clusters_ranking):
-            print(f"Cluster {i}: Importance Score = {ranking}")
-
-        return sorted(clusters_ranking, key=lambda x: x[1], reverse=True)
-
 
 def main():
     dataset = MNISTDataset()
@@ -85,7 +97,7 @@ def main():
     sample_size = 10
     dataloader = list(itertools.islice(dataloader, sample_size))
 
-    sift = SIFT()
+    sift = FeautureExtractingAlgorithm()
     descriptors, paths_to_file = [], []
     for (x, _, path_to_file) in tqdm(dataloader, desc="Generating descriptors using SIFT"):
         img = x.squeeze(0).permute(1, 2, 0).numpy()
@@ -100,7 +112,7 @@ def main():
     # clustering = KMeansClustering(optimal_n_clusters)
     clustering = KMeansClustering()
 
-    clusters = clustering.run(flat_descriptors)
+    clusters = clustering.fit(flat_descriptors)
     clusters_labels, clusters_centroids = clusters.labels_, clusters.cluster_centers_
     clustering.plot_sample(flat_descriptors, clusters_centroids, clusters_labels)
     clusters_ranking = clustering.rank_clusters(flat_descriptors, clusters_centroids, clusters_labels)

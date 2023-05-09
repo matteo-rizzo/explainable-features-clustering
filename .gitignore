@@ -198,7 +198,7 @@ fabric.properties
 # Android studio 3.1+ serialized cache file
 
 ### JetBrains+all Patch ###
-# Ignore everything but code style settings and run configurations
+# Ignore everything but code style settings and fit configurations
 # that are supposed to be shared within teams.
 
 .idea/*
@@ -436,7 +436,7 @@ Temporary Items
 # Android studio 3.1+ serialized cache file
 
 ### PyCharm+all Patch ###
-# Ignore everything but code style settings and run configurations
+# Ignore everything but code style settings and fit configurations
 # that are supposed to be shared within teams.
 
 
@@ -580,7 +580,7 @@ ipython_config.py
 
 # pyenv
 #   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
+#   intended to fit in multiple environments; otherwise, check them in:
 # .python-version
 
 # pipenv
@@ -1052,7 +1052,7 @@ paket-files/
 # OpenCover UI analysis results
 OpenCover/
 
-# Azure Stream Analytics local run output
+# Azure Stream Analytics local fit output
 ASALocalRun/
 
 # MSBuild Binary and Structured Log

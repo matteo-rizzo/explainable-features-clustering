@@ -4,14 +4,14 @@ import cv2
 import numpy as np
 from torch import Tensor
 
-from classes.SIFT import SIFT
+from classes.FeautureExtractingAlgorithm import FeautureExtractingAlgorithm
 
 
 class Vocabulary:
 
     def __init__(self, visual_words: List):
         self.__visual_words = visual_words
-        self.__sift = SIFT()
+        self.__sift = FeautureExtractingAlgorithm()
 
     def match_words(self, x: np.ndarray) -> List:
         # match the features with the visual words using cross correlation

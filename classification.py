@@ -4,15 +4,17 @@ import cv2
 import numpy as np
 import torchmetrics
 import yaml
+from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
 
 from classes.Clustering import KMeansClustering
+from classes.FeautureExtractingAlgorithm import FeautureExtractingAlgorithm
 from classes.MNISTDataset import MNISTDataset
-from classes.SIFT import SIFT
 
 
 def main():
+    plot_flag: bool = True
     # -----------------------------------------------------------------------------------
     logger = logging.getLogger(__name__)
     with open('config/training/training_configuration.yaml', 'r') as f:
@@ -36,38 +38,51 @@ def main():
                              num_workers=config["workers"])
     # -----------------------------------------------------------------------------------
     # TODO: genetic algorithm to maximise these features?
-    key_points_extractor = SIFT(nfeatures=150,  # (default = 0 = all) Small images, few features
-                                nOctaveLayers=3,  # (default = 3) Default should be ok
-                                contrastThreshold=0.04,  # (default = 0.04) Lower = Include kps with lower contrast
-                                edgeThreshold=20,  # (default = 10) Higher = Include keypoints with lower edge response
-                                sigma=1.1)  # (default = 1.2) capture finer details in the images
+    # key_points_extractor = FeautureExtractingAlgorithm(nfeatures=150,
+    #                                                    # (default = 0 = all) Small images, few features
+    #                                                    nOctaveLayers=3,
+    #                                                    # (default = 3) Default should be ok
+    #                                                    contrastThreshold=0.04,
+    #                                                    # (default = 0.04) Lower = Include kps with lower contrast
+    #                                                    edgeThreshold=20,
+    #                                                    # (default = 10) Higher = Include KPS with lower edge response
+    #                                                    sigma=1.1)  # (default = 1.2) capture finer details in the images
+    key_points_extractor = FeautureExtractingAlgorithm(algorithm="")
+    # -----------------------------------------------------------------------------------
+    if plot_flag:
+        for imgs, _ in train_loader:
+            for img in imgs:
+                img = (img.numpy().squeeze() * 255).astype(np.uint8)
+                kp, _ = key_points_extractor.run(img)
+                img_kp = cv2.drawKeypoints(img,
+                                           kp,
+                                           None,
+                                           flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
+                # Display image
+                cv2.namedWindow('Image', cv2.WINDOW_NORMAL)
+
+                # Display image
+                scale = 4  # Adjust this to change the size of the image
+                resized_img = cv2.resize(img_kp, (img_kp.shape[1] * scale, img_kp.shape[0] * scale))
+                cv2.imshow('Image', resized_img)
+                # cv2.imshow('SIFT Keypoints', img_kp)
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()
+    # -----------------------------------------------------------------------------------
     keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
 
-    for imgs, _ in train_loader:
-        for img in imgs:
-            img = (img.numpy().squeeze() * 255).astype(np.uint8)
-            kp, _ = key_points_extractor.run(img)
-            img_kp = cv2.drawKeypoints(img,
-                                       kp,
-                                       None,
-                                       flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-
-            # Display image
-            cv2.namedWindow('SIFT Image', cv2.WINDOW_NORMAL)
-
-            # Display image
-            scale = 4  # Adjust this to change the size of the image
-            resized_img = cv2.resize(img_kp, (img_kp.shape[1] * scale, img_kp.shape[0] * scale))
-            cv2.imshow('SIFT Image', resized_img)
-            # cv2.imshow('SIFT Keypoints', img_kp)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
     # TODO HDBScan
-    clustering = KMeansClustering()
+    clustering = KMeansClustering(n_clusters=20)
 
     flat_descriptors = np.concatenate(descriptors)
-    clusters = clustering.run(flat_descriptors)
-    labels, centroids = clusters.labels_, clusters.cluster_centers_
+    clustering.fit(flat_descriptors)
+    labels, centroids = clustering.get_labels(), clustering.get_centroids()
+
+    # Plot the data points and centroids
+    plt.scatter(flat_descriptors[:, 0], flat_descriptors[:, 1], c=labels)
+    plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=100, linewidths=3, c='k')
+    plt.show()
 
     # TODO FROM HERE ON ------
     # clustering.plot_sample(flat_descriptors, centroids, labels, sample_size=400000)
@@ -98,4 +113,23 @@ def main():
 
 
 if __name__ == "__main__":
+    # import cv2
+    #
+    # # Load an image
+    # img = cv2.imread("dataset/26.png", cv2.IMREAD_GRAYSCALE)
+    #
+    # # Create a KAZE object
+    # kaze = cv2.AKAZE_create()
+    #
+    # # Detect keypoints and extract descriptors
+    # keypoints, descriptors = kaze.detectAndCompute(img, None)
+    #
+    # # Draw keypoints on the image
+    # img_with_keypoints = cv2.drawKeypoints(img, keypoints, None, color=(0, 255, 0),
+    #                                        flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    #
+    # # Display the image with keypoints
+    # cv2.imshow("Image with keypoints", img_with_keypoints)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
     main()
