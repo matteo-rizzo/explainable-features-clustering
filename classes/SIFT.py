@@ -38,7 +38,9 @@ class SIFT:
     def get_descriptors(self, dataloader: DataLoader) -> List:
         descriptors = []
         for (x, _) in tqdm(dataloader, desc="Generating descriptors using SIFT"):
-            img = x.squeeze(0).permute(1, 2, 0).numpy()
+            # Make numpy -> Squeeze 1 (grayscale) dim -> go from float to 0-255 representation
+            img = (x.numpy().squeeze() * 255).astype(np.uint8)
+            # img = x.squeeze(0).permute(1, 2, 0).numpy()
             _, img_descriptors = self.run(img)
             if img_descriptors is not None:
                 descriptors.append(img_descriptors)
@@ -47,7 +49,9 @@ class SIFT:
     def get_keypoints(self, dataloader: DataLoader) -> List:
         keypoints = []
         for (x, _) in tqdm(dataloader, desc="Generating keypoints using SIFT"):
-            img = x.squeeze(0).permute(1, 2, 0).numpy()
+            # Make numpy -> Squeeze 1 (grayscale) dim -> go from float to 0-255 representation
+            img = (x.numpy().squeeze() * 255).astype(np.uint8)
+            # img = x.squeeze(0).permute(1, 2, 0).numpy()
             img_keypoints, _ = self.run(img)
             if img_keypoints is not None:
                 keypoints.append(img_keypoints)
@@ -56,7 +60,9 @@ class SIFT:
     def get_descriptors_and_keypoints(self, dataloader: DataLoader) -> Tuple[List, List]:
         descriptors, keypoints = [], []
         for (x, _) in tqdm(dataloader, desc="Generating keypoints and descriptors using SIFT"):
-            img = x.squeeze(0).permute(1, 2, 0).numpy()
+            # Make numpy -> Squeeze 1 (grayscale) dim -> go from float to 0-255 representation
+            img = (x.numpy().squeeze() * 255).astype(np.uint8)
+            # img = x.squeeze(0).permute(1, 2, 0).numpy()
             img_keypoints, img_descriptors = self.run(img)
             if img_descriptors is not None:
                 keypoints.append(img_keypoints)

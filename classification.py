@@ -30,20 +30,27 @@ def main():
         "F1": torchmetrics.F1Score(task="multiclass", num_classes=10, average="macro")
     })
 
-    train_data = DataLoader(MNISTDataset(train=True))
-    test_data = DataLoader(MNISTDataset(train=False))
+    train_loader = DataLoader(MNISTDataset(train=True),
+                              batch_size=config["batch_size"],
+                              shuffle=True,
+                              num_workers=config["workers"])
+    test_loader = DataLoader(MNISTDataset(train=False),
+                             batch_size=config["batch_size"],
+                             shuffle=True,
+                             num_workers=config["workers"])
     # -----------------------------------------------------------------------------------
     key_points_extractor = SIFT()
-    key_points, descriptors = [], []
+    descriptors = key_points_extractor.get_descriptors(train_loader)
 
-    for (imgs, _) in train_data:
-        kp, des = key_points_extractor.run(imgs)
-        key_points.append(kp)
-        descriptors.append(des)
+    # TODO HDBScan
+    clustering = KMeansClustering()
 
-    clusterizer = KMeansClustering()
-    clusters = clusterizer.run(descriptors)
-    ranking = clusterizer.rank_clusters(clusters)
+    flat_descriptors = np.concatenate(descriptors)
+    clusters = clustering.run(flat_descriptors)
+    labels, centroids = clusters.labels_, clusters.cluster_centers_
+
+    clustering.plot_sample(flat_descriptors, centroids, labels, sample_size=400000)
+    ranking = clustering.rank_clusters(flat_descriptors, centroids, labels)
 
     vocabulary = Vocabulary()
     X, y = vocabulary.embed(ranking)
@@ -66,7 +73,7 @@ def main():
     # -----------------------------------------------------------------------------------
     trainer = Trainer(ImportanceWeightedCNN, config=config, hyperparameters=hyp,
                       metric_collection=metric_collection, logger=logger)
-    trainer.train(train_dataloader=train_data, test_dataloader=test_data)
+    trainer.train(train_dataloader=train_loader, test_dataloader=test_loader)
     # -----------------------------------------------------------------------------------
 
 

@@ -16,8 +16,10 @@ EPOCHS = 15
 
 
 def main():
-    train_loader = DataLoader(MNISTDataset(train=True), batch_size=64, shuffle=True, num_workers=2)
-    test_loader = DataLoader(MNISTDataset(train=False), batch_size=64, shuffle=False, num_workers=2)
+    train_loader = DataLoader(MNISTDataset(train=True),
+                              batch_size=64, shuffle=True, num_workers=2)
+    test_loader = DataLoader(MNISTDataset(train=False),
+                             batch_size=64, shuffle=False, num_workers=2)
 
     sift = SIFT()
     _, descriptors = sift.get_descriptors(train_loader)
