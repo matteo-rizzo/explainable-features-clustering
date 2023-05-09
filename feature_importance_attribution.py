@@ -39,7 +39,7 @@ def main():
     for epoch in range(EPOCHS):
 
         running_loss, correct, total = 0.0, 0, 0
-        for i, (x, y, _) in tqdm(enumerate(train_loader), desc="Training epoch: {}".format(epoch)):
+        for i, (x, y) in tqdm(enumerate(train_loader), desc="Training epoch: {}".format(epoch)):
             x, y = x.to(device), y.to(device)
             o = model.predict(x).to(device)
             loss = model.update_weights(o, y)
@@ -49,7 +49,7 @@ def main():
         train_loss, train_accuracy = running_loss / len(train_loader), 100 * correct / total
 
         running_loss, correct, total = 0.0, 0, 0
-        for i, (x, y, _) in tqdm(enumerate(test_loader), desc="Testing epoch: {}".format(epoch)):
+        for i, (x, y) in tqdm(enumerate(test_loader), desc="Testing epoch: {}".format(epoch)):
             x, y = x.to(device), y.to(device)
             o = model.predict(x).to(device)
             loss = model.get_loss(o, y)
