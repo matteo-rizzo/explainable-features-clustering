@@ -62,7 +62,7 @@ class FeautureExtractingAlgorithm:
             # Accelerated kaze version - designed to be faster and more efficient than the original algorithm,
             # while maintaining its robustness to scale changes and other image transformations.
             self._algorithm = cv2.AKAZE_create(**kwargs)
-        if algorithm.upper() == "FREAK":
+        elif algorithm.upper() == "FREAK":
             raise NotImplementedError
             # (Fast Retina Keypoint): A fast keypoint detector and descriptor that
             # extracts features in a retina-like way.
@@ -83,6 +83,9 @@ class FeautureExtractingAlgorithm:
             # (Adaptive and Generic Accelerated Segment Test): A variant of FAST corner detector that is adaptive
             # to different image structures and performs well on noisy images.
             self._algorithm = cv2.AgastFeatureDetector_create(**kwargs)
+        else:
+            raise ValueError("Invalid algorithm selected. "
+                             "Must be one of: [SIFT, ORB, KAZE, AKAZE, FREAK, BRISK, MSER, FAST, AGAST]")
 
     def run(self, img: np.ndarray) -> Tuple[Tuple, Optional[np.ndarray]]:
         if self.name.upper() in ["MSER", "FAST", "AGAST"]:
