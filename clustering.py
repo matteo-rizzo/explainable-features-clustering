@@ -9,6 +9,7 @@ from sklearn.cluster import AgglomerativeClustering
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
 from tqdm import tqdm
+import seaborn as sns
 
 from classes.FeautureExtractingAlgorithm import FeautureExtractingAlgorithm
 from classes.MNISTDataset import MNISTDataset
@@ -16,10 +17,10 @@ from classes.MNISTDataset import MNISTDataset
 
 def reducer(descriptors):
     _reducer = umap.UMAP(
-        n_neighbors=10,
+        n_neighbors=15,
         min_dist=0.0,
         n_components=2,
-        random_state=12121,
+        random_state=42069,
         metric="cosine"
     )
     # print("Running umap...")
@@ -40,18 +41,21 @@ def reducer(descriptors):
 
 
 def plot(cluster_labels, reduced_vectors):
+    # Set the seaborn style to "darkgrid"
+    sns.set(style="darkgrid")
+
     clustered = (cluster_labels >= 0)
     plt.figure(figsize=(10, 10), dpi=200)
     plt.scatter(reduced_vectors[~clustered, 0],
                 reduced_vectors[~clustered, 1],
                 color=(0.5, 0.5, 0.5),
-                s=0.1,
+                s=0.2,
                 alpha=0.5)
 
     plt.scatter(reduced_vectors[clustered, 0],
                 reduced_vectors[clustered, 1],
                 c=cluster_labels[clustered],
-                s=0.1,
+                s=0.2,
                 cmap="Spectral")
 
     # labels, centroids = clustering.get_labels(), clustering.get_centroids()
@@ -67,7 +71,7 @@ def run_hdbscan(descriptors):
     print("Running HDBSCAN...")
     # -- Clustering ---
     clusterer = hdbscan.HDBSCAN(min_cluster_size=10,
-                                min_samples=5,
+                                min_samples=3,
                                 cluster_selection_method="eom",
                                 metric="euclidean")
 
@@ -78,7 +82,12 @@ def run_hac(descriptors):
     print("Running HAC...")
 
     # Create and fit Agglomerative Clustering
-    clusterer = AgglomerativeClustering(n_clusters=None, linkage='ward', distance_threshold=0.5)
+    clusterer = AgglomerativeClustering(n_clusters=10,
+                                        metric='euclidean',
+                                        # linkage="average"
+                                        # linkage='ward',
+                                        # distance_threshold=2.0
+                                        )
     return clusterer.fit_predict(descriptors)
 
 
