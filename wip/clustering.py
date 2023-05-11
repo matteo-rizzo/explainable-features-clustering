@@ -8,7 +8,7 @@ import yaml
 from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 
-from classes.FeautureExtractingAlgorithm import FeautureExtractingAlgorithm
+from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.data.MNISTDataset import MNISTDataset
 from functional.utils import print_minutes
 
@@ -133,7 +133,7 @@ def main():
     # TODO: genetic algorithm to maximise these features?
     # -----------------------------------------------------------------------------------
     # --- Keypoint extraction and feature description ---
-    key_points_extractor = FeautureExtractingAlgorithm(algorithm="SIFT")
+    key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT")
     keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
     # -- Reduction ---
     flat_descriptors = np.concatenate(descriptors)
