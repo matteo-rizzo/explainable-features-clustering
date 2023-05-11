@@ -41,6 +41,7 @@ class Clusterer:
 
 class DimensionalityReducer:
     def __init__(self, algorithm: str = "UMAP", logger=logging.getLogger(__name__), **kwargs):
+        self.name: str = algorithm
         self.logger: logging.Logger = logger
         if algorithm.upper() == "UMAP":
             self.__reducer = UMAP(**kwargs)
@@ -48,20 +49,20 @@ class DimensionalityReducer:
             self.__reducer = PCA(**kwargs)
         self.logger.info(f"Initializing dimensionality reduction with {algorithm.upper()} algorithm.")
 
-    def fit_transform(self, vectors: np.ndarray):
-        self.logger.info(f"Starting fit + transform...")
+    def fit_transform(self, vectors: np.ndarray) -> np.ndarray:
+        self.logger.info(f"Starting {self.name} fit + transform...")
         t0 = time.perf_counter()
         reduced_vectors: np.ndarray = self.__reducer.fit_transform(vectors)
-        print_minutes(time.perf_counter() - t0, self.logger)
+        print_minutes(time.perf_counter() - t0, self.name, self.logger)
         return reduced_vectors
 
     def fit(self, vectors: np.ndarray) -> None:
         t0 = time.perf_counter()
-        self.logger.info(f"Starting fit...")
-        print_minutes(time.perf_counter() - t0, self.logger)
+        self.logger.info(f"Starting {self.name} fit...")
+        print_minutes(time.perf_counter() - t0, self.name, self.logger)
         self.__reducer.fit(vectors)
 
-    def transform(self, vectors: np.ndarray):
+    def transform(self, vectors: np.ndarray) -> np.ndarray:
         return self.__reducer.transform(vectors)
 
 
@@ -142,12 +143,12 @@ def main():
     t0 = time.perf_counter()
     cluster_labels = run_hdbscan(descriptors)
     plot(cluster_labels, reduced_vectors)
-    print_minutes(time.perf_counter() - t0)
+    print_minutes(time.perf_counter() - t0, "HDBSCAN")
     # -- Clustering ---
     t0 = time.perf_counter()
     cluster_labels = run_hac(descriptors)
     plot(cluster_labels, reduced_vectors)
-    print_minutes(time.perf_counter() - t0)
+    print_minutes(time.perf_counter() - t0, "HAC")
 
     # clustering.fit(flat_descriptors)
     # labels, centroids = clustering.get_labels(), clustering.get_centroids()

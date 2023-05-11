@@ -99,10 +99,10 @@ def colorstr(*input_arguments):
     return ''.join(colors[x] for x in args) + f'{string}' + colors['end']
 
 
-def print_minutes(seconds: float, logger: logging.Logger = None):
+def print_minutes(seconds: float, input_str: str, logger: logging.Logger = None):
     minutes = seconds // 60  # Integer division to get whole minutes
     remaining_seconds = seconds % 60  # Remainder gives the remaining seconds
     if logger:
-        logger.info(f"{minutes}m {remaining_seconds:.2f}s elapsed.")
+        logger.info(f"{input_str} took {minutes}m {remaining_seconds:.2f}s.")
     else:
-        print(f"{minutes}m {remaining_seconds}s")
+        print(f"{input_str} took {minutes}m {remaining_seconds}s")
