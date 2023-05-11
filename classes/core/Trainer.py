@@ -22,8 +22,7 @@ from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from classes.factories.OptimizerFactory import OptimizerFactory
 from functional.lr_schedulers import linear_lrs, one_cycle_lrs
-from functional.setup import get_device
-from functional.torch_utils import strip_optimizer
+from functional.torch_utils import strip_optimizer, get_device
 from functional.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run, colorstr
 
 

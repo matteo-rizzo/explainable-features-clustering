@@ -1,5 +1,0 @@
-DEVICE_TYPE = "cpu"
-EPOCHS = 15
-OPTIMIZER = "Adam"
-LEARNING_RATE = 0.003
-CRITERION = "CrossEntropyLoss"
