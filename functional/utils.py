@@ -1,4 +1,5 @@
 import glob
+import logging
 import os
 import re
 from pathlib import Path
@@ -96,3 +97,12 @@ def colorstr(*input_arguments):
               'bold': '\033[1m',
               'underline': '\033[4m'}
     return ''.join(colors[x] for x in args) + f'{string}' + colors['end']
+
+
+def print_minutes(seconds: float, logger: logging.Logger = None):
+    minutes = seconds // 60  # Integer division to get whole minutes
+    remaining_seconds = seconds % 60  # Remainder gives the remaining seconds
+    if logger:
+        logger.info(f"{minutes}m {remaining_seconds:.2f}s elapsed.")
+    else:
+        print(f"{minutes}m {remaining_seconds}s")

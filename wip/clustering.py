@@ -1,42 +1,68 @@
+import logging
 import time
 
-import hdbscan
+import colorlog
 import numpy as np
-import umap
+import seaborn as sns
 import yaml
 from matplotlib import pyplot as plt
-from sklearn.cluster import AgglomerativeClustering
 from torch.utils.data import DataLoader
-from tqdm import tqdm
-import seaborn as sns
 
 from classes.FeautureExtractingAlgorithm import FeautureExtractingAlgorithm
 from classes.data.MNISTDataset import MNISTDataset
+from functional.utils import print_minutes
+
+try:
+    # Nvidia rapids / cuml gpu support
+    from cuml import UMAP, PCA  # Also: Incremental PCA, Truncated SVD, Random Projections, TSNE
+    from cuml.cluster import HDBSCAN, AgglomerativeClustering, KMeans  # Also: DBScan
+
+    print("Importing decomposition and clustering algorithms with GPU support")
+except ImportError:
+    # Standard cpu support
+    from umap import UMAP
+    from hdbscan import HDBSCAN
+    from sklearn.cluster import AgglomerativeClustering
+    from sklearn.decomposition import PCA
+
+    print("Importing decomposition and clustering algorithms with CPU support")
+
+args = {"n_neighbors": 15,
+        "min_dist": 0.0,
+        "n_components": 2,
+        "random_state": 42069,
+        "metric": "euclidean"}
 
 
-def reducer(descriptors):
-    _reducer = umap.UMAP(
-        n_neighbors=15,
-        min_dist=0.0,
-        n_components=2,
-        random_state=42069,
-        metric="cosine"
-    )
-    # print("Running umap...")
-    # reduced_vectors = _reducer.fit_transform(latent_vectors)
-    t0 = time.perf_counter()
-    with tqdm(total=1, desc="Running umap...", bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
-        # Fit UMAP and update progress bar
-        _reducer.fit(descriptors)
-        pbar.update(1)
-    print(f"{time.perf_counter()-t0:.2f}s")
-    reduced_vectors = _reducer.transform(descriptors)
-    # -- Clustering ---
-    cluster_labels = run_hdbscan(descriptors)
-    plot(cluster_labels, reduced_vectors)
+class Clusterer:
+    def __init__(self):
+        pass
 
-    cluster_labels = run_hac(descriptors)
-    plot(cluster_labels, reduced_vectors)
+
+class DimensionalityReducer:
+    def __init__(self, algorithm: str = "UMAP", logger=logging.getLogger(__name__), **kwargs):
+        self.logger: logging.Logger = logger
+        if algorithm.upper() == "UMAP":
+            self.__reducer = UMAP(**kwargs)
+        elif algorithm.upper() == "PCA":
+            self.__reducer = PCA(**kwargs)
+        self.logger.info(f"Initializing dimensionality reduction with {algorithm.upper()} algorithm.")
+
+    def fit_transform(self, vectors: np.ndarray):
+        self.logger.info(f"Starting fit + transform...")
+        t0 = time.perf_counter()
+        reduced_vectors: np.ndarray = self.__reducer.fit_transform(vectors)
+        print_minutes(time.perf_counter() - t0, self.logger)
+        return reduced_vectors
+
+    def fit(self, vectors: np.ndarray) -> None:
+        t0 = time.perf_counter()
+        self.logger.info(f"Starting fit...")
+        print_minutes(time.perf_counter() - t0, self.logger)
+        self.__reducer.fit(vectors)
+
+    def transform(self, vectors: np.ndarray):
+        return self.__reducer.transform(vectors)
 
 
 def plot(cluster_labels, reduced_vectors):
@@ -68,52 +94,60 @@ def plot(cluster_labels, reduced_vectors):
 
 def run_hdbscan(descriptors):
     print("Running HDBSCAN...")
-    # -- Clustering ---
-    clusterer = hdbscan.HDBSCAN(min_cluster_size=10,
-                                min_samples=3,
-                                cluster_selection_method="eom",
-                                metric="euclidean")
+    clusterer = HDBSCAN(min_cluster_size=10,
+                        min_samples=3,
+                        cluster_selection_method="eom",
+                        metric="euclidean")
 
     return clusterer.fit_predict(descriptors)
 
 
 def run_hac(descriptors):
     print("Running HAC...")
-
-    # Create and fit Agglomerative Clustering
-    clusterer = AgglomerativeClustering(n_clusters=10,
-                                        metric='euclidean',
-                                        # linkage="average"
-                                        # linkage='ward',
-                                        # distance_threshold=2.0
-                                        )
+    clusterer = AgglomerativeClustering(n_clusters=10, affinity='euclidean')
     return clusterer.fit_predict(descriptors)
 
 
 def main():
-    with open('../config/training/training_configuration.yaml', 'r') as f:
+    # --- Config ---
+    with open('config/training/training_configuration.yaml', 'r') as f:
         config = yaml.safe_load(f)
-
+    # --- Logger ---
+    logger = logging.getLogger(__name__)
+    logger.setLevel(config["logger"])
+    ch = logging.StreamHandler()
+    ch.setLevel(config["logger"])
+    formatter = colorlog.ColoredFormatter(
+        "%(log_color)s[%(asctime)s] - %(levelname)s - %(white)s%(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    # --- Dataset ---
     train_loader = DataLoader(MNISTDataset(train=True),
                               batch_size=config["batch_size"],
                               shuffle=False,
                               num_workers=config["workers"])
-    test_loader = DataLoader(MNISTDataset(train=False),
-                             batch_size=config["batch_size"],
-                             shuffle=False,
-                             num_workers=config["workers"])
     # -----------------------------------------------------------------------------------
     # TODO: genetic algorithm to maximise these features?
     # -----------------------------------------------------------------------------------
+    # --- Keypoint extraction and feature description ---
     key_points_extractor = FeautureExtractingAlgorithm(algorithm="SIFT")
     keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
-
-    # TODO HDBScan
-    # clustering = KMeansClustering(n_clusters=10)
-    # print(descriptors)
+    # -- Reduction ---
     flat_descriptors = np.concatenate(descriptors)
-    print(flat_descriptors.shape)
-    reducer(flat_descriptors[234243:, :])
+    dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", **args)
+    reduced_vectors = dimensionality_reducer.fit_transform(flat_descriptors)
+    # -- Clustering ---
+    t0 = time.perf_counter()
+    cluster_labels = run_hdbscan(descriptors)
+    plot(cluster_labels, reduced_vectors)
+    print_minutes(time.perf_counter() - t0)
+    # -- Clustering ---
+    t0 = time.perf_counter()
+    cluster_labels = run_hac(descriptors)
+    plot(cluster_labels, reduced_vectors)
+    print_minutes(time.perf_counter() - t0)
 
     # clustering.fit(flat_descriptors)
     # labels, centroids = clustering.get_labels(), clustering.get_centroids()
@@ -126,4 +160,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # show_4()

@@ -58,33 +58,36 @@ def grid_search(estimator_class: T,
     return all_results
 
 
-def find_optimal_n_clusters(documents, conf_search: str | Path, **kwargs) -> None:
+def find_optimal_n_clusters(clustering_algorithm,
+                            descriptors,
+                            reduced_descriptors,
+                            conf_search: str | Path, **kwargs) -> None:
     _plot_path: Path = Path("dumps/plots")
 
     with open(conf_search, encoding="UTF-8") as f:
         conf_search = yaml.load(f, Loader=yaml.FullLoader)["clustering"]
 
-    documents = [d.body for d in documents]
+    # documents = [d.body for d in documents]
 
-    embeddings = _embedding_model.encode(documents, show_progress_bar=False)
+    # descriptors = _embedding_model.encode(documents, show_progress_bar=False)
 
     if kwargs.get("normalize", False):
-        embeddings /= np.linalg.norm(embeddings, axis=1).reshape(-1, 1)
+        descriptors /= np.linalg.norm(descriptors, axis=1).reshape(-1, 1)
 
-    umap_embeddings = _topic_model._reduce_dimensionality(embeddings)
+    # umap_embeddings = _topic_model._reduce_dimensionality(descriptors)
 
     # 2. Select best hyperparameters
 
-    if isinstance(_clustering_model, KMeans):
+    if isinstance(clustering_algorithm, KMeans):
         c = conf_search["kmeans"]
         distortions, silhouette_scores = [], []
         k_range = range(c["k_start"], c["k_end"])
         for k in k_range:
             clustering = KMeans(n_clusters=k, n_init="auto", random_state=0)
-            clustering.fit(umap_embeddings)
+            clustering.fit(reduced_descriptors)
             distortions.append(clustering.inertia_)  # lower the better
             silhouette_scores.append(
-                silhouette_score(umap_embeddings, clustering.labels_))  # higher the better (ideal > .5)
+                silhouette_score(reduced_descriptors, clustering.labels_))  # higher the better (ideal > .5)
 
         fig, ax = plt.subplots(1, 2, figsize=(12, 4))
         ax[0].plot(k_range, distortions, "bx-")
@@ -111,7 +114,9 @@ def find_optimal_n_clusters(documents, conf_search: str | Path, **kwargs) -> Non
         def fun_dbcv(est: HDBSCAN) -> float:
             return float(est.relative_validity_)
 
-        results = grid_search(HDBSCAN, grid_params=c, metric_fun=fun_dbcv, estimator_fit_args=(umap_embeddings,),
+        results = grid_search(HDBSCAN, grid_params=c,
+                              metric_fun=fun_dbcv,
+                              estimator_fit_args=(reduced_descriptors,),
                               large_is_better=True,
                               estimator_kwargs=dict(gen_min_span_tree=True))
 
