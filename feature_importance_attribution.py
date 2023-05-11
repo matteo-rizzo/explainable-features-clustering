@@ -2,10 +2,10 @@ import numpy as np
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.clustering.KMeansClustering import KMeansClustering
 from classes.data.MNISTDataset import MNISTDataset
 from classes.deep_learning.models.ModelImportanceWeightedCNN import ModelImportanceWeightedCNN
-from classes.FeautureExtractingAlgorithm import FeautureExtractingAlgorithm
 from functional.torch_utils import get_device
 
 DEVICE_TYPE = "cpu"
@@ -21,7 +21,7 @@ def main():
     test_loader = DataLoader(MNISTDataset(train=False),
                              batch_size=64, shuffle=False, num_workers=2)
 
-    sift = FeautureExtractingAlgorithm()
+    sift = FeatureExtractingAlgorithm()
     _, descriptors = sift.get_keypoints_and_descriptors(train_loader)
     flat_descriptors = np.concatenate(descriptors)
 

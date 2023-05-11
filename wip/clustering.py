@@ -2,15 +2,15 @@ import time
 
 import hdbscan
 import numpy as np
+import seaborn as sns
 import umap
 import yaml
 from matplotlib import pyplot as plt
 from sklearn.cluster import AgglomerativeClustering
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import seaborn as sns
 
-from classes.FeautureExtractingAlgorithm import FeautureExtractingAlgorithm
+from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.data.MNISTDataset import MNISTDataset
 
 
@@ -105,7 +105,7 @@ def main():
     # -----------------------------------------------------------------------------------
     # TODO: genetic algorithm to maximise these features?
     # -----------------------------------------------------------------------------------
-    key_points_extractor = FeautureExtractingAlgorithm(algorithm="SIFT")
+    key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT")
     keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
 
     # TODO HDBScan

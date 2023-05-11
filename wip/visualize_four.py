@@ -3,7 +3,7 @@ import numpy as np
 import yaml
 from torch.utils.data import DataLoader
 
-from classes.FeautureExtractingAlgorithm import FeautureExtractingAlgorithm
+from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.data.MNISTDataset import MNISTDataset
 
 
@@ -15,44 +15,44 @@ def show_4():
                               batch_size=config["batch_size"],
                               shuffle=False,
                               num_workers=config["workers"])
-    key_points_extractor_1 = FeautureExtractingAlgorithm(nfeatures=200,
-                                                         # (default = 0 = all) Small images, few features
-                                                         nOctaveLayers=3,
-                                                         # (default = 3) Default should be ok
-                                                         contrastThreshold=0.04,
-                                                         # (default = 0.04) Lower = Include kps with lower contrast
-                                                         edgeThreshold=10,
-                                                         # (default = 10) Higher = Include KPS with lower edge response
-                                                         sigma=1.2)  # (default = 1.2) capture finer details in imgs
-    key_points_extractor_2 = FeautureExtractingAlgorithm(nfeatures=200,
-                                                         # (default = 0 = all) Small images, few features
-                                                         nOctaveLayers=3,
-                                                         # (default = 3) Default should be ok
-                                                         contrastThreshold=0.04,
-                                                         # (default = 0.04) Lower = Include kps with lower contrast
-                                                         edgeThreshold=10,
-                                                         # (default = 10) Higher = Include KPS with lower edge response
-                                                         sigma=0.75)  # (default = 1.2) capture finer details in imgs
+    key_points_extractor_1 = FeatureExtractingAlgorithm(nfeatures=200,
+                                                        # (default = 0 = all) Small images, few features
+                                                        nOctaveLayers=3,
+                                                        # (default = 3) Default should be ok
+                                                        contrastThreshold=0.04,
+                                                        # (default = 0.04) Lower = Include kps with lower contrast
+                                                        edgeThreshold=10,
+                                                        # (default = 10) Higher = Include KPS with lower edge response
+                                                        sigma=1.2)  # (default = 1.2) capture finer details in imgs
+    key_points_extractor_2 = FeatureExtractingAlgorithm(nfeatures=200,
+                                                        # (default = 0 = all) Small images, few features
+                                                        nOctaveLayers=3,
+                                                        # (default = 3) Default should be ok
+                                                        contrastThreshold=0.04,
+                                                        # (default = 0.04) Lower = Include kps with lower contrast
+                                                        edgeThreshold=10,
+                                                        # (default = 10) Higher = Include KPS with lower edge response
+                                                        sigma=0.75)  # (default = 1.2) capture finer details in imgs
 
-    key_points_extractor_3 = FeautureExtractingAlgorithm(nfeatures=200,
-                                                         # (default = 0 = all) Small images, few features
-                                                         nOctaveLayers=3,
-                                                         # (default = 3) Default should be ok
-                                                         contrastThreshold=0.04,
-                                                         # (default = 0.04) Lower = Include kps with lower contrast
-                                                         edgeThreshold=20,
-                                                         # (default = 10) Higher = Include KPS with lower edge response
-                                                         sigma=1.2)  # (default = 1.2) capture finer details in imgs
+    key_points_extractor_3 = FeatureExtractingAlgorithm(nfeatures=200,
+                                                        # (default = 0 = all) Small images, few features
+                                                        nOctaveLayers=3,
+                                                        # (default = 3) Default should be ok
+                                                        contrastThreshold=0.04,
+                                                        # (default = 0.04) Lower = Include kps with lower contrast
+                                                        edgeThreshold=20,
+                                                        # (default = 10) Higher = Include KPS with lower edge response
+                                                        sigma=1.2)  # (default = 1.2) capture finer details in imgs
 
-    key_points_extractor_4 = FeautureExtractingAlgorithm(nfeatures=200,
-                                                         # (default = 0 = all) Small images, few features
-                                                         nOctaveLayers=3,
-                                                         # (default = 3) Default should be ok
-                                                         contrastThreshold=0.04,
-                                                         # (default = 0.04) Lower = Include kps with lower contrast
-                                                         edgeThreshold=20,
-                                                         # (default = 10) Higher = Include KPS with lower edge response
-                                                         sigma=0.75)  # (default = 1.2) capture finer details in imgs
+    key_points_extractor_4 = FeatureExtractingAlgorithm(nfeatures=200,
+                                                        # (default = 0 = all) Small images, few features
+                                                        nOctaveLayers=3,
+                                                        # (default = 3) Default should be ok
+                                                        contrastThreshold=0.04,
+                                                        # (default = 0.04) Lower = Include kps with lower contrast
+                                                        edgeThreshold=20,
+                                                        # (default = 10) Higher = Include KPS with lower edge response
+                                                        sigma=0.75)  # (default = 1.2) capture finer details in imgs
     # for imgs, _ in train_loader:
     for imgs, _ in train_loader:
         for img in imgs:
