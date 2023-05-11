@@ -1,3 +1,5 @@
+import time
+
 import cv2
 import hdbscan
 import numpy as np
@@ -26,11 +28,12 @@ def reducer(descriptors):
     # print("Running umap...")
     # reduced_vectors = _reducer.fit_transform(latent_vectors)
     # Create a progress bar using tqdm
+    t0 = time.perf_counter()
     with tqdm(total=1, desc="Running umap...", bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
         # Fit UMAP and update progress bar
         _reducer.fit(descriptors)
         pbar.update(1)
-
+    print(f"{time.perf_counter()-t0:.2f}s")
     reduced_vectors = _reducer.transform(descriptors)
     # -- Clustering ---
     cluster_labels = run_hdbscan(descriptors)
@@ -111,7 +114,7 @@ def main():
 
     # TODO HDBScan
     # clustering = KMeansClustering(n_clusters=10)
-
+    print(descriptors)
     flat_descriptors = np.concatenate(descriptors)
     reducer(flat_descriptors)
 

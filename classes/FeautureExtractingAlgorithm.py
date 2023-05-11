@@ -99,60 +99,16 @@ class FeautureExtractingAlgorithm:
         plt.show()
         plt.clf()
 
-    # def get_descriptors(self, dataloader: DataLoader) -> List:
-    #     descriptors = []
-    #     for (x, _) in tqdm(dataloader, desc=f"Generating descriptors using {self.name}"):
-    #         # Make numpy -> Squeeze 1 (grayscale) dim -> go from float to 0-255 representation
-    #         img = (x.numpy().squeeze() * 255).astype(np.uint8)
-    #         if self.name == "SIFT":
-    #             # Sift is smart and accepts the batch of imgs
-    #             _, img_descriptors = self.run(img)
-    #             if img_descriptors is not None:
-    #                 descriptors.append(img_descriptors)
-    #         else:
-    #             # Others need to process image by image
-    #             for i in range(img.shape[0]):
-    #                 _, img_descriptors = self.run(img[i])
-    #                 if img_descriptors is not None:
-    #                     descriptors.append(img_descriptors)
-    #     return descriptors
-    #
-    # def get_keypoints(self, dataloader: DataLoader) -> List:
-    #     keypoints = []
-    #     for (x, _) in tqdm(dataloader, desc=f"Generating keypoints using {self.name}"):
-    #         # Make numpy -> Squeeze 1 (grayscale) dim -> go from float to 0-255 representation
-    #         imgs = (x.numpy().squeeze() * 255).astype(np.uint8)
-    #         if self.name == "SIFT":
-    #             # Sift is smart and accepts the batch of imgs
-    #             img_keypoints, _ = self.run(imgs)
-    #             if img_keypoints is not None:
-    #                 keypoints.append(img_keypoints)
-    #         else:
-    #             # Others need to process image by image
-    #             for i in range(imgs.shape[0]):
-    #                 img_keypoints, _ = self.run(imgs)
-    #                 if img_keypoints is not None:
-    #                     keypoints.append(img_keypoints)
-    #     return keypoints
-
     def get_keypoints_and_descriptors(self, dataloader: DataLoader) -> Tuple[List, List]:
         descriptors, keypoints = [], []
         for (x, _) in tqdm(dataloader, desc=f"Generating keypoints and descriptors using {self.name}"):
             # Make numpy -> Squeeze 1 (grayscale) dim -> go from float to 0-255 representation
             imgs = (x.numpy().squeeze() * 255).astype(np.uint8)
-            if self.name == "SIFT":
-                # Sift is smart and accepts the batch of imgs
-                img_keypoints, img_descriptors = self.run(imgs)
+            for i in range(imgs.shape[0]):
+                img_keypoints, img_descriptors = self.run(imgs[i])
                 if img_descriptors is not None:
                     keypoints.append(img_keypoints)
                     descriptors.append(img_descriptors)
-            else:
-                # Others need to process image by image
-                for i in range(imgs.shape[0]):
-                    img_keypoints, img_descriptors = self.run(imgs[i])
-                    if img_descriptors is not None:
-                        keypoints.append(img_keypoints)
-                        descriptors.append(img_descriptors)
         return keypoints, descriptors
 
 
