@@ -95,7 +95,7 @@ def run_hac(descriptors):
 
 
 def main():
-    with open('config/training/training_configuration.yaml', 'r') as f:
+    with open('../config/training/training_configuration.yaml', 'r') as f:
         config = yaml.safe_load(f)
 
     train_loader = DataLoader(MNISTDataset(train=True),
@@ -129,9 +129,9 @@ def main():
 
 
 def show_4():
-    with open('config/training/training_configuration.yaml', 'r') as f:
+    with open('../config/training/training_configuration.yaml', 'r') as f:
         config = yaml.safe_load(f)
-    with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
+    with open('../config/training/hypeparameter_configuration.yaml', 'r') as f:
         hyp = yaml.safe_load(f)
     metric_collection = MetricCollection({
         'accuracy': torchmetrics.Accuracy(task="multiclass", num_classes=10),

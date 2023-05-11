@@ -4,7 +4,7 @@ import re
 import numpy as np
 import torch
 
-from settings import DEVICE_TYPE
+from config.settings import DEVICE_TYPE
 
 
 def set_random_seed(seed: int, device: torch.device):
