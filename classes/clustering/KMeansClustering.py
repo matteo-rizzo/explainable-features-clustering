@@ -9,8 +9,8 @@ from sklearn.metrics import silhouette_score
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.data.MNISTDataset import MNISTDataset
-from classes.FeautureExtractingAlgorithm import FeautureExtractingAlgorithm
 
 
 class KMeansClustering:
@@ -97,7 +97,7 @@ def main():
     sample_size = 10
     dataloader = list(itertools.islice(dataloader, sample_size))
 
-    sift = FeautureExtractingAlgorithm()
+    sift = FeatureExtractingAlgorithm()
     descriptors, paths_to_file = [], []
     for (x, _, path_to_file) in tqdm(dataloader, desc="Generating descriptors using SIFT"):
         img = x.squeeze(0).permute(1, 2, 0).numpy()

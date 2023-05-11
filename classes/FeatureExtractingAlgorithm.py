@@ -21,7 +21,7 @@ recognition, image stitching, and so on.
 """
 
 
-class FeautureExtractingAlgorithm:
+class FeatureExtractingAlgorithm:
 
     def __init__(self, algorithm: str = "SIFT", **kwargs):
         # nfeatures: The number of keypoints to detect.
@@ -115,7 +115,7 @@ class FeautureExtractingAlgorithm:
 def main():
     dataset = MNISTDataset()
     dataloader = DataLoader(dataset, shuffle=True)
-    sift = FeautureExtractingAlgorithm()
+    sift = FeatureExtractingAlgorithm()
 
     for (x, _) in dataloader:
         img = x.squeeze(0).permute(1, 2, 0).numpy()

@@ -7,9 +7,10 @@ from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
 
+from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.clustering.KMeansClustering import KMeansClustering
-from classes.FeautureExtractingAlgorithm import FeautureExtractingAlgorithm
 from classes.data.MNISTDataset import MNISTDataset
+from classes.data.Vocabulary import Vocabulary
 
 
 def main():
@@ -37,8 +38,8 @@ def main():
     # -----------------------------------------------------------------------------------
     # TODO: genetic algorithm to maximise these features?
     # -----------------------------------------------------------------------------------
-    key_points_extractor = FeautureExtractingAlgorithm(algorithm="SIFT")
-    keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
+    key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT")
+    key_points, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
 
     clustering = KMeansClustering(n_clusters=10)
 
@@ -53,10 +54,11 @@ def main():
     plt.show()
 
     # TODO FROM HERE ON ------
-    # clustering.plot_sample(flat_descriptors, centroids, labels, sample_size=400000)
-    # ranking = clustering.rank_clusters(flat_descriptors, centroids, labels)
-    # vocabulary = Vocabulary()
-    # X, y = vocabulary.embed(ranking)
+    ranking = clustering.rank_clusters(flat_descriptors, centroids, labels)
+    words = centroids[ranking]
+    vocabulary = Vocabulary(words)
+
+    X, y = vocabulary.embed(train_loader)
     # # -----------------------------------------------------------------------------------
     # svm = LinearSVC()
     # # train the machine learning model on the feature matrix and label vector
