@@ -7,9 +7,9 @@ from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
 
-from classes.Clustering import KMeansClustering
+from classes.clustering.KMeansClustering import KMeansClustering
 from classes.FeautureExtractingAlgorithm import FeautureExtractingAlgorithm
-from classes.MNISTDataset import MNISTDataset
+from classes.data.MNISTDataset import MNISTDataset
 
 
 def main():

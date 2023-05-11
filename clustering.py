@@ -14,7 +14,7 @@ from tqdm import tqdm
 import seaborn as sns
 
 from classes.FeautureExtractingAlgorithm import FeautureExtractingAlgorithm
-from classes.MNISTDataset import MNISTDataset
+from classes.data.MNISTDataset import MNISTDataset
 
 
 def reducer(descriptors):
@@ -114,9 +114,10 @@ def main():
 
     # TODO HDBScan
     # clustering = KMeansClustering(n_clusters=10)
-    print(descriptors)
+    # print(descriptors)
     flat_descriptors = np.concatenate(descriptors)
-    reducer(flat_descriptors)
+    print(flat_descriptors.shape)
+    reducer(flat_descriptors[234243:, :])
 
     # clustering.fit(flat_descriptors)
     # labels, centroids = clustering.get_labels(), clustering.get_centroids()

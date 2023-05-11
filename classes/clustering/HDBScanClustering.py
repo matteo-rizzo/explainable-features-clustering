@@ -16,7 +16,7 @@ TODO:
     - Try hierarchical clustering (e.g., random forest)
     - Visualize features (keep in mind that if you want to average the extracted descriptors those should be
         account for SIFT's scale and rotation
-    - Use simpler features for MNIST (e.g., simply 7x7 image patch) and try SIFT on more articulated datasets
+    - Use simpler features for MNIST (e.g., simply 7x7 image patch) and try SIFT on more articulated data
     - Check SIFT's parameters here: https://amroamroamro.github.io/mexopencv/matlab/cv.SIFT.detectAndCompute.html
     - Try out:
         * HDBscan: https://hdbscan.readthedocs.io/en/latest/how_hdbscan_works.html

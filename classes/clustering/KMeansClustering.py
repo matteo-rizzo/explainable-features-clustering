@@ -9,7 +9,7 @@ from sklearn.metrics import silhouette_score
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from classes.MNISTDataset import MNISTDataset
+from classes.data.MNISTDataset import MNISTDataset
 from classes.FeautureExtractingAlgorithm import FeautureExtractingAlgorithm
 
 

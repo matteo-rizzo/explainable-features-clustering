@@ -18,7 +18,7 @@ notest: False # Only test final epoch
 logger: "INFO"
 
 # --- Configuration files and paths ---
-data: "config/datasets/mnist.yaml" # data.yaml path
+data: "config/data/mnist.yaml" # data.yaml path
 architecture_config: "default"
 weights: "" # Initial weights path
 hyperparameters: "config/training/hypeparameter_configuration.yaml"  # Hyperparameters path

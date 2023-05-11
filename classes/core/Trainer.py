@@ -16,7 +16,7 @@ from torch.utils.data import Dataset
 from torchmetrics import MetricCollection
 from tqdm import tqdm
 
-from classes.MNISTDataset import MNISTDataset
+from classes.data.MNISTDataset import MNISTDataset
 from classes.deep_learning.architectures.ImportanceWeightedCNN import ImportanceWeightedCNN
 from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
@@ -76,7 +76,8 @@ class Trainer:
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
 
-    def train(self, train_dataloader: torch.utils.data.DataLoader, test_dataloader: torch.utils.data.DataLoader = None):
+    def train(self, train_dataloader: torch.utils.data.DataLoader,
+              test_dataloader: torch.utils.data.DataLoader = None):
         # --- Directories, initialize where things are saved ---
         self.__start_or_resume_config()
         save_dir, weights_dir, last_ckpt, best_ckpt, results_file = self.__init_dump_folder()

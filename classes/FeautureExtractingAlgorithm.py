@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from classes.MNISTDataset import MNISTDataset
+from classes.data.MNISTDataset import MNISTDataset
 
 """
 Extracting key points from an image is a common task in computer vision and can be done using various techniques such 
