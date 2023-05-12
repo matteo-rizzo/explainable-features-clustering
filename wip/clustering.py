@@ -6,7 +6,7 @@ from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.clustering.Clusterer import Clusterer
 from classes.clustering.DimensionalityReducer import DimensionalityReducer
 from classes.data.MNISTDataset import MNISTDataset
-from functional.utils import default_logger, join_dicts
+from functional.utils import default_logger
 
 
 def main():
@@ -30,17 +30,18 @@ def main():
     keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
     flat_descriptors = np.concatenate(descriptors)
     # -- Reduction ---
-    args = join_dicts(clustering_config["umap_args"])
-    dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", logger=logger, **args)
+    dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", logger=logger, **clustering_config["umap_args"])
     reduced_vectors = dimensionality_reducer.fit_transform(flat_descriptors)
     # -- Clustering ---
-    args = join_dicts(clustering_config["hdbscan_args"])
-    clusterer = Clusterer(algorithm="HDBSCAN", logger=logger, **args)
+    clusterer = Clusterer(algorithm="HDBSCAN", logger=logger, **clustering_config["hdbscan_args"])
     labels = clusterer.fit_predict(reduced_vectors)
     clusterer.plot(reduced_vectors, labels)
     # -- Clustering --
-    args = join_dicts(clustering_config["hac_args"])
-    clusterer = Clusterer(algorithm="HAC", logger=logger, **args)
+    clusterer = Clusterer(algorithm="HAC", logger=logger, **clustering_config["hac_args"])
+    labels = clusterer.fit_predict(reduced_vectors)
+    clusterer.plot(reduced_vectors, labels)
+    # -- Clustering --
+    clusterer = Clusterer(algorithm="KMEANS", logger=logger, **clustering_config["kmeans_args"])
     labels = clusterer.fit_predict(reduced_vectors)
     clusterer.plot(reduced_vectors, labels)
 

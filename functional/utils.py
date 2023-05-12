@@ -6,12 +6,6 @@ from pathlib import Path
 
 import colorlog
 
-
-def join_dicts(dictionary: list[dict]) -> dict:
-    """ Join a list of dictionaries """
-    return {k: v for d in dictionary for k, v in d.items()}
-
-
 def intersect_dicts(dict_a: dict, dict_b: dict, exclude=()):
     # Dictionary intersection of matching keys and shapes, omitting 'exclude' keys, using dict_a values
     return {k: v for k, v in dict_a.items() if k in dict_b
@@ -106,7 +100,7 @@ def colorstr(*input_arguments):
     return ''.join(colors[x] for x in args) + f'{string}' + colors['end']
 
 
-def default_logger(logger_level: str) -> logging.Logger:
+def default_logger(logger_level: str = "INFO") -> logging.Logger:
     logger = logging.getLogger(__name__)
     logger.setLevel(logger_level)
     ch = logging.StreamHandler()

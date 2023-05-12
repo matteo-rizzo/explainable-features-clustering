@@ -1,17 +1,20 @@
 umap_args:
-  - "n_neighbors": 15
-  - "min_dist": 0.0
-  - "n_components": 2
-  - "random_state": 42069
-  - "metric": "euclidean"
+  "n_neighbors": 15
+  "min_dist": 0.0
+  "n_components": 2
+  "random_state": 42069
+  "metric": "euclidean"
 
 
 hdbscan_args:
-  - "min_cluster_size": 10
-  - "min_samples": 3
-  - "cluster_selection_method": "eom"
-  - "metric": "euclidean"
+  "min_cluster_size": 10
+  "min_samples": 3
+  "cluster_selection_method": "eom"
+  "metric": "euclidean"
 
 hac_args:
-  - "n_clusters": 10
-  - "metric": "euclidean"
+  "n_clusters": 10
+  "metric": "euclidean"
+
+kmeans_args:
+  "n_clusters": 10

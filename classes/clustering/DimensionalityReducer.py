@@ -17,7 +17,7 @@ except ImportError:
 
     DEVICE: str = "CPU"
 
-log_on_default("INFO", f"Importing decomposition algorithms with {DEVICE} support")
+log_on_default("INFO", f"Importing decomposition algorithms with {DEVICE} support.")
 
 
 class DimensionalityReducer:
