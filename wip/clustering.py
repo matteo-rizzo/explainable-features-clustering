@@ -16,22 +16,16 @@ try:
     # Nvidia rapids / cuml gpu support
     from cuml import UMAP, PCA  # Also: Incremental PCA, Truncated SVD, Random Projections, TSNE
     from cuml.cluster import HDBSCAN, AgglomerativeClustering, KMeans  # Also: DBScan
-
-    print("Importing decomposition and clustering algorithms with GPU support")
+    DEVICE: str = "GPU"
 except ImportError:
     # Standard cpu support
     from umap import UMAP
     from hdbscan import HDBSCAN
     from sklearn.cluster import AgglomerativeClustering
     from sklearn.decomposition import PCA
+    DEVICE: str = "CPU"
 
-    print("Importing decomposition and clustering algorithms with CPU support")
-
-args = {"n_neighbors": 15,
-        "min_dist": 0.0,
-        "n_components": 2,
-        "random_state": 42069,
-        "metric": "euclidean"}
+print(f"Importing decomposition and clustering algorithms with {DEVICE} support")
 
 
 class Clusterer:
@@ -105,6 +99,7 @@ def run_hdbscan(descriptors):
 
 def run_hac(descriptors):
     print("Running HAC...")
+    # TODO: if cpu = metric else affinity
     clusterer = AgglomerativeClustering(n_clusters=10, affinity='euclidean')
     return clusterer.fit_predict(descriptors)
 
@@ -132,6 +127,11 @@ def main():
     # -----------------------------------------------------------------------------------
     # TODO: genetic algorithm to maximise these features?
     # -----------------------------------------------------------------------------------
+    args = {"n_neighbors": 15,
+            "min_dist": 0.0,
+            "n_components": 2,
+            "random_state": 42069,
+            "metric": "euclidean"}
     # --- Keypoint extraction and feature description ---
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT")
     keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
@@ -141,12 +141,12 @@ def main():
     reduced_vectors = dimensionality_reducer.fit_transform(flat_descriptors)
     # -- Clustering ---
     t0 = time.perf_counter()
-    cluster_labels = run_hdbscan(descriptors)
+    cluster_labels = run_hdbscan(flat_descriptors)
     plot(cluster_labels, reduced_vectors)
     print_minutes(time.perf_counter() - t0, "HDBSCAN")
     # -- Clustering ---
     t0 = time.perf_counter()
-    cluster_labels = run_hac(descriptors)
+    cluster_labels = run_hac(flat_descriptors)
     plot(cluster_labels, reduced_vectors)
     print_minutes(time.perf_counter() - t0, "HAC")
 
