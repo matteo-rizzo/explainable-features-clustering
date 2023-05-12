@@ -1,3 +1,4 @@
+import logging
 from typing import Tuple, List, Optional
 
 import cv2
@@ -23,7 +24,7 @@ recognition, image stitching, and so on.
 
 class FeatureExtractingAlgorithm:
 
-    def __init__(self, algorithm: str = "SIFT", **kwargs):
+    def __init__(self, algorithm: str = "SIFT", logger: logging.Logger = logging.getLogger(__name__), **kwargs):
         # nfeatures: The number of keypoints to detect.
         # This can be used to limit the number of keypoints returned by the algorithm.
         # By default, nfeatures is set to 0, which means that all keypoints are detected.
@@ -44,6 +45,7 @@ class FeatureExtractingAlgorithm:
         # sigma: The initial Gaussian blur applied to the image before constructing the scale space.
         # By default, sigma is set to 1.6.
         self.name: str = algorithm
+        self.logger: logging.Logger = logger
         if algorithm.upper() == "SIFT":
             # (Scale-Invariant Feature Transform) is a feature detection and description algorithm that detects
             # scale-invariant keypoints and computes descriptors based on gradient orientation histograms.

@@ -4,6 +4,13 @@ import os
 import re
 from pathlib import Path
 
+import colorlog
+
+
+def join_dicts(dictionary: list[dict]) -> dict:
+    """ Join a list of dictionaries """
+    return {k: v for d in dictionary for k, v in d.items()}
+
 
 def intersect_dicts(dict_a: dict, dict_b: dict, exclude=()):
     # Dictionary intersection of matching keys and shapes, omitting 'exclude' keys, using dict_a values
@@ -97,6 +104,39 @@ def colorstr(*input_arguments):
               'bold': '\033[1m',
               'underline': '\033[4m'}
     return ''.join(colors[x] for x in args) + f'{string}' + colors['end']
+
+
+def default_logger(logger_level: str) -> logging.Logger:
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logger_level)
+    ch = logging.StreamHandler()
+    ch.setLevel(logger_level)
+    formatter = colorlog.ColoredFormatter(
+        "%(log_color)s[%(asctime)s] - %(levelname)s - %(white)s%(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    return logger
+
+
+def log_on_default(logger_level: str, message: str) -> None:
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logger_level)
+    ch = logging.StreamHandler()
+    ch.setLevel(logger_level)
+    formatter = colorlog.ColoredFormatter(
+        "%(log_color)s[%(asctime)s] - %(levelname)s - %(white)s%(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    logger.info(message)
+    # Remove the formatter and handles from the logger
+    for handler in logger.handlers:
+        handler.setFormatter(None)
+        logger.removeHandler(handler)
+    del logger
 
 
 def print_minutes(seconds: float, input_str: str, logger: logging.Logger = None):
