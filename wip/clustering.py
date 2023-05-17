@@ -32,26 +32,18 @@ def main():
     # -- Reduction ---
     dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", logger=logger, **clustering_config["umap_args"])
     reduced_vectors = dimensionality_reducer.fit_transform(flat_descriptors)
-    # -- Clustering ---
+    # -- HDBSCAN Clustering ---
     clusterer = Clusterer(algorithm="HDBSCAN", logger=logger, **clustering_config["hdbscan_args"])
-    labels = clusterer.fit_predict(reduced_vectors)
+    labels = clusterer.fit_predict(flat_descriptors)
     clusterer.plot(reduced_vectors, labels)
-    # -- Clustering --
+    # -- HAC Clustering --
     clusterer = Clusterer(algorithm="HAC", logger=logger, **clustering_config["hac_args"])
-    labels = clusterer.fit_predict(reduced_vectors)
+    labels = clusterer.fit_predict(flat_descriptors)
     clusterer.plot(reduced_vectors, labels)
-    # -- Clustering --
+    # -- KMEANS Clustering --
     clusterer = Clusterer(algorithm="KMEANS", logger=logger, **clustering_config["kmeans_args"])
-    labels = clusterer.fit_predict(reduced_vectors)
+    labels = clusterer.fit_predict(flat_descriptors)
     clusterer.plot(reduced_vectors, labels)
-
-    # clustering.fit(flat_descriptors)
-    # labels, centroids = clustering.get_labels(), clustering.get_centroids()
-
-    # Plot the data points and centroids
-    # plt.scatter(flat_descriptors[:, 0], flat_descriptors[:, 1], c=labels)
-    # plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=100, linewidths=3, c='k')
-    # plt.show()
 
 
 if __name__ == "__main__":

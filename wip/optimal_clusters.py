@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 from typing import TypeVar, Iterable, Callable, Generic
 
+import hdbscan
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -13,7 +14,7 @@ from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.clustering.Clusterer import Clusterer
 from classes.clustering.DimensionalityReducer import DimensionalityReducer
 from classes.data.MNISTDataset import MNISTDataset
-from functional.utils import default_logger
+from functional.utils import default_logger, colorstr
 
 try:
     # Nvidia rapids / cuml gpu support
@@ -21,8 +22,6 @@ try:
 except ImportError:
     # Standard cpu support
     from sklearn.metrics import silhouette_score
-
-
 
 T = TypeVar("T")
 
@@ -33,8 +32,9 @@ def grid_search(estimator_class: T,
                 large_is_better: bool,
                 estimator_fit_args: Iterable = None,
                 estimator_fit_kwargs: dict = None,
-                estimator_kwargs: dict = None) -> list[dict]:
-    print("Started grid search...")
+                estimator_kwargs: dict = None,
+                logger=logging.getLogger(__name__)) -> list[dict]:
+    logger.info(f"Started {colorstr('bold', 'magenta', 'grid search')}{colorstr('white', '...')}")
     # Stable clusters
     estimator_fit_args = estimator_fit_args if estimator_fit_args is not None else list()
     estimator_fit_kwargs = estimator_fit_kwargs if estimator_fit_kwargs is not None else dict()
@@ -49,18 +49,23 @@ def grid_search(estimator_class: T,
     k_args, args_list = zip(*grid_params.items())
     args_len = [list(range(len(a))) for a in args_list]
     args_index_combinations: list[tuple] = itertools.product(*args_len)
-
-    for comb_idx in args_index_combinations:
+    # TODO: REMOVE
+    length = len(list(args_index_combinations))
+    args_index_combinations: list[tuple] = itertools.product(*args_len)
+    for idx, comb_idx in enumerate(args_index_combinations):
         # Prepare argument combination
         vals = [arg[i] for arg, i in zip(args_list, comb_idx)]
         kv_args = dict(zip(k_args, vals))
 
         # Clustering
-        est = estimator_class(**kv_args, **estimator_kwargs).fit(*estimator_fit_args, **estimator_fit_kwargs)
+        est = estimator_class(algorithm="HDBSCAN", logger=logger, **kv_args, **estimator_kwargs)
+        est.fit(*estimator_fit_args, **estimator_fit_kwargs)
+        est = est.get_estimator()
         # DBCV score
         score = metric_fun(est)
         n_clusters = int(est.labels_.max() + 1)
         ext_args = {**kv_args, "score": score, "n_clusters": n_clusters}
+        logger.info(f"[{idx}/{length}] - score: {score:.3f} (best: {best_score:.3f})")
         # if we got a better score, store it and the parameters
         if compare_fn(score, best_score):
             best_score = score
@@ -153,15 +158,16 @@ def find_optimal_n_clusters(clustering_algorithm: str,
     # --- HDBSCAN ---
     elif clustering_algorithm.upper() == "HDBSCAN":
         # Define the score function
-        raise NotImplementedError
+        # raise NotImplementedError
         def fun_dbcv(est: hdbscan.HDBSCAN) -> float:
             return float(est.relative_validity_)
 
-        results = grid_search(hdbscan.HDBSCAN, grid_params=config,
+        results = grid_search(Clusterer, grid_params=config,
                               metric_fun=fun_dbcv,
                               estimator_fit_args=(reduced_descriptors,),
                               large_is_better=True,
-                              estimator_kwargs=dict(gen_min_span_tree=True))
+                              estimator_kwargs=dict(gen_min_span_tree=True),
+                              logger=logger)
 
         dfr = pd.DataFrame.from_records(results).sort_values(by="score", ascending=False)
 
@@ -198,7 +204,7 @@ def main():
     dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", logger=logger, **clustering_config["umap_args"])
     reduced_vectors = dimensionality_reducer.fit_transform(flat_descriptors)
 
-    find_optimal_n_clusters("KMEANS", flat_descriptors, reduced_vectors, logger)
+    find_optimal_n_clusters("HDBSCAN", flat_descriptors, reduced_vectors, logger)
 
 
 if __name__ == "__main__":

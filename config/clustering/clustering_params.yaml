@@ -7,10 +7,11 @@ umap_args:
 
 
 hdbscan_args:
-  "min_cluster_size": 10
-  "min_samples": 3
+  "min_cluster_size": 5
+  "min_samples": 1
   "cluster_selection_method": "eom"
-  "metric": "euclidean"
+  "cluster_selection_epsilon": 0.5
+  "metric": "manhattan"
 
 hac_args:
   "n_clusters": 10

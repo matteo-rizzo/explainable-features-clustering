@@ -3,18 +3,19 @@ import time
 
 import numpy as np
 import seaborn as sns
+from hdbscan import HDBSCAN # Best on CPU regardless
 from matplotlib import pyplot as plt
 
 from functional.utils import print_minutes, log_on_default
 
 try:
     # Nvidia rapids / cuml gpu support
-    from cuml.cluster import HDBSCAN, AgglomerativeClustering, KMeans  # Also: DBScan
+    from cuml.cluster import AgglomerativeClustering, KMeans
 
     DEVICE: str = "GPU"
 except ImportError:
     # Standard cpu support
-    from hdbscan import HDBSCAN
+
     from sklearn.cluster import AgglomerativeClustering, KMeans
 
     DEVICE: str = "CPU"
@@ -41,13 +42,22 @@ class Clusterer:
 
     def fit_predict(self, vectors: np.ndarray) -> np.ndarray:
         t0 = time.perf_counter()
-        self.logger.info(f"Running {self.name}...")
+        self.logger.info(f"Running {self.name} fit_predict...")
         cluster_labels = self.__clusterer.fit_predict(vectors)
         print_minutes(seconds=(time.perf_counter() - t0), input_str=self.name, logger=self.logger)
         return cluster_labels
 
+    def fit(self, vectors: np.ndarray) -> None:
+        t0 = time.perf_counter()
+        self.logger.info(f"Running {self.name} fit...")
+        self.__clusterer.fit(vectors)
+        print_minutes(seconds=(time.perf_counter() - t0), input_str=self.name, logger=self.logger)
+
     def score(self, vectors: np.ndarray) -> float:
         return self.__clusterer.score(vectors)
+
+    def get_estimator(self):
+        return self.__clusterer
 
     @staticmethod
     def plot(vectors, labels):
