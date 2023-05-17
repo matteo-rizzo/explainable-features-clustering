@@ -93,8 +93,85 @@ def show_4():
             cv2.destroyAllWindows()
 
 
+def show_4_corner():
+    with open('config/training/training_configuration.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+
+    train_loader = DataLoader(MNISTDataset(train=True),
+                              batch_size=config["batch_size"],
+                              shuffle=False,
+                              num_workers=config["workers"])
+    # for imgs, _ in train_loader:
+    for imgs, _ in train_loader:
+        for img in imgs:
+            # Create a blank canvas to display the images
+            canvas = np.zeros((28 * 2, 28 * 2, 3), dtype=np.uint8)
+            # ---------------------------------------------------
+            img = img.numpy().squeeze()
+            # ---------------------------------------------------
+            corner_imgs = []
+            # block_size, ksize, k = 2, 3, 0.04
+            # corner_imgs.append(cv2.cornerHarris(img, block_size, ksize, k))
+            # block_size, ksize, k = 2, 3, 0.05
+            # corner_imgs.append(cv2.cornerHarris(img, block_size, ksize, k))
+            # block_size, ksize, k = 2, 3, 0.06
+            # corner_imgs.append(cv2.cornerHarris(img, block_size, ksize, k))
+            # block_size, ksize, k = 2, 3, 0.07
+            # corner_imgs.append(cv2.cornerHarris(img, block_size, ksize, k))
+
+            # Set the parameters for Shi-Tomasi Corner Detector
+            max_corners = None  # Maximum number of corners to detect
+            quality_level = 0.01  # Quality level threshold
+            min_distance = 1  # Minimum distance between detected corners
+            corner_imgs.append(np.int0(cv2.goodFeaturesToTrack(img, max_corners, quality_level, min_distance)))
+
+            max_corners = None  # Maximum number of corners to detect
+            quality_level = 0.01  # Quality level threshold
+            min_distance = 2  # Minimum distance between detected corners
+            corner_imgs.append(np.int0(cv2.goodFeaturesToTrack(img, max_corners, quality_level, min_distance)))
+
+            max_corners = None  # Maximum number of corners to detect
+            quality_level = 0.1  # Quality level threshold
+            min_distance = 3  # Minimum distance between detected corners
+            corner_imgs.append(np.int0(cv2.goodFeaturesToTrack(img, max_corners, quality_level, min_distance)))
+
+            max_corners = None  # Maximum number of corners to detect
+            quality_level = 0.01  # Quality level threshold
+            min_distance = 4  # Minimum distance between detected corners
+            corner_imgs.append(np.int0(cv2.goodFeaturesToTrack(img, max_corners, quality_level, min_distance)))
+            # Loop through each digit and its keypoints
+            for i, corner_img in enumerate(corner_imgs):
+                # threshold = 0.01  # Adjust this value to change the threshold
+                # corner_img_thresholded = corner_img > threshold * corner_img.max()
+                # ---------------------------------------------------
+                color_img = cv2.cvtColor((img * 255).astype(np.uint8), cv2.COLOR_GRAY2BGR)
+                # color_img[corner_img_thresholded] = [0, 0, 255]  # Mark the corners in red (assuming a color image)
+
+                # Compute the coordinates for placing the image on the canvas
+                x = (i % 2) * 28
+                y = (i // 2) * 28
+
+                # Place the image with keypoints on the canvas
+                canvas[y:y + 28, x:x + 28] = color_img
+
+                for corner in corner_img:
+                    _x, _y = corner.ravel()
+                    # x = (i % 2) * 28
+                    # y = (i // 2) * 28
+                    cv2.circle(canvas[y:y + 28, x:x + 28], (_x, _y), 3, (0, 0, 255), -1)
+
+            # ---------------------------------------------------
+            cv2.namedWindow('Canvas', cv2.WINDOW_NORMAL)
+            scale = 4  # Adjust this to change the size of the canvas
+            resized_canvas = cv2.resize(canvas, (canvas.shape[1] * scale, canvas.shape[0] * scale))
+            cv2.imshow('Canvas', resized_canvas)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+
 if __name__ == "__main__":
-    show_4()
+    # show_4()
+    show_4_corner()
 
 # 1 step - corner detection. Poi ci sono degli step che sopprimono feature troppo vicine alle altre
 # Anche globalmente, le feature stesse vengono clusterizzate e tengono feature distinte
