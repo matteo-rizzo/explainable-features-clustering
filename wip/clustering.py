@@ -35,15 +35,16 @@ def main():
     # -- HDBSCAN Clustering ---
     clusterer = Clusterer(algorithm="HDBSCAN", logger=logger, **clustering_config["hdbscan_args"])
     labels = clusterer.fit_predict(flat_descriptors)
-    clusterer.plot(reduced_vectors, labels)
+    clusterer.plot_3d(reduced_vectors, labels, "HDBSCAN")
     # -- HAC Clustering --
     clusterer = Clusterer(algorithm="HAC", logger=logger, **clustering_config["hac_args"])
     labels = clusterer.fit_predict(flat_descriptors)
-    clusterer.plot(reduced_vectors, labels)
+    clusterer.plot_3d(reduced_vectors, labels, "HAC")
     # -- KMEANS Clustering --
     clusterer = Clusterer(algorithm="KMEANS", logger=logger, **clustering_config["kmeans_args"])
     labels = clusterer.fit_predict(flat_descriptors)
-    clusterer.plot(reduced_vectors, labels)
+    # clusterer.plot(reduced_vectors, labels, "KMEANS")
+    clusterer.plot_3d(reduced_vectors, labels, "KMEANS")
 
 
 if __name__ == "__main__":

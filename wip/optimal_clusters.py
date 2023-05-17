@@ -111,7 +111,6 @@ def grid_search(estimator_class: T,
 
 def find_optimal_n_clusters(clustering_algorithm: str,
                             descriptors: np.ndarray,
-                            reduced_descriptors: np.ndarray,
                             logger: logging.Logger,
                             **kwargs) -> None:
     # --- Config ---
@@ -128,16 +127,19 @@ def find_optimal_n_clusters(clustering_algorithm: str,
         distortions, silhouette_scores = [], []
         k_range = range(config["k_start"], config["k_end"])
         for k in k_range:
-            clustering = Clusterer(algorithm="KMEANS", logger=logger, n_clusters=k, random_state=0)
+            clustering = Clusterer(algorithm="KMEANS",
+                                   logger=logger, n_clusters=k, random_state=0)
             # clustering = cuml.cluster.KMeans(n_clusters=k, n_init="auto", random_state=0)
-            labels = clustering.fit_predict(reduced_descriptors)
-            # Should be same as inertia_
-            distortion = clustering.score(reduced_descriptors)
+            labels = clustering.fit_predict(descriptors)
+            # Distortion is the average of the euclidean squared distance
+            # from the centroid of the respective clusters.
+            # Inertia is the sum of squared distances of samples to their closest cluster centre.
+            distortion = clustering.score(descriptors)
             distortions.append(distortion)  # lower the better
             # Higher the better (ideal > .5)
-            sh_score = silhouette_score(reduced_descriptors, labels)
-            silhouette_scores.append(silhouette_score(reduced_descriptors, labels))
-            logger.info(f"[k = {k}] Distortion: {distortion}, Silouhette score: {sh_score}")
+            # sh_score = silhouette_score(descriptors, labels)
+            # silhouette_scores.append(silhouette_score(descriptors, labels))
+            logger.info(f"[k = {k}] Distortion: {distortion}") # , Silouhette score: {sh_score}")
 
         fig, ax = plt.subplots(1, 2, figsize=(12, 4))
         ax[0].plot(k_range, distortions, "bx-")
@@ -146,15 +148,15 @@ def find_optimal_n_clusters(clustering_algorithm: str,
         ax[0].set_title("Elbow Method")
         ax[0].grid(True)
 
-        ax[1].plot(k_range, silhouette_scores, "bx-")
-        ax[1].set_xlabel("Number of Clusters")
-        ax[1].set_ylabel("Silhouette Score (the higher the better)")
-        ax[1].set_title("Silhouette Method")
-        ax[1].grid(True)
+        # ax[1].plot(k_range, silhouette_scores, "bx-")
+        # ax[1].set_xlabel("Number of Clusters")
+        # ax[1].set_ylabel("Silhouette Score (the higher the better)")
+        # ax[1].set_title("Silhouette Method")
+        # ax[1].grid(True)
 
         plt.show()
 
-        optimal_n_clusters = np.argmax(silhouette_scores) + config["k_start"]
+        # optimal_n_clusters = np.argmax(silhouette_scores) + config["k_start"]
     # --- HDBSCAN ---
     elif clustering_algorithm.upper() == "HDBSCAN":
         # Define the score function
@@ -164,7 +166,7 @@ def find_optimal_n_clusters(clustering_algorithm: str,
 
         results = grid_search(Clusterer, grid_params=config,
                               metric_fun=fun_dbcv,
-                              estimator_fit_args=(reduced_descriptors,),
+                              estimator_fit_args=(descriptors,),
                               large_is_better=True,
                               estimator_kwargs=dict(gen_min_span_tree=True),
                               logger=logger)
@@ -204,7 +206,7 @@ def main():
     dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", logger=logger, **clustering_config["umap_args"])
     reduced_vectors = dimensionality_reducer.fit_transform(flat_descriptors)
 
-    find_optimal_n_clusters("HDBSCAN", flat_descriptors, reduced_vectors, logger)
+    find_optimal_n_clusters("KMEANS", flat_descriptors, logger)
 
 
 if __name__ == "__main__":
