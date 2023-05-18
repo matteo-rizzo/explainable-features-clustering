@@ -49,6 +49,22 @@ class CornerExtractingAlgorithm:
                 corners.extend(level_corners)
         return corners
 
+    def plot(self, image, corners):
+        color_img = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        for corner in corners:
+            x, y = corner.astype(int) if self.multi_scale else corner.ravel().astype(int)
+            cv2.circle(color_img, (x, y), 1, (0, 0, 255), -1)
+
+        cv2.namedWindow(f"{self.name.title()} {'Multiscale' if self.multi_scale else ''} "
+                        f"Corner Detection", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(f"{self.name.title()} {'Multiscale' if self.multi_scale else ''} "
+                         f"Corner Detection", 512, 512)  # Set the desired window size
+
+        # Display the result
+        cv2.imshow(f"{self.name.title()} {'Multiscale' if self.multi_scale else ''} Corner Detection", color_img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
 
 def main():
     args = {
@@ -60,8 +76,9 @@ def main():
         "k": 0.04  # Free parameter for the Harris detector
     }
     image = cv2.imread("dataset/26.png", 0)  # Read the image in grayscale
-    fea = CornerExtractingAlgorithm(multi_scale=True)
-    print(fea(image, **args))
+    fea = CornerExtractingAlgorithm(multi_scale=False)
+    corners = fea(image, **args)
+    fea.plot(image, corners)
 
 
 if __name__ == "__main__":
