@@ -93,7 +93,7 @@ def show_4():
             cv2.destroyAllWindows()
 
 
-def show_4_corner():
+def show_4_harris():
     with open('config/training/training_configuration.yaml', 'r') as f:
         config = yaml.safe_load(f)
 
@@ -110,14 +110,68 @@ def show_4_corner():
             img = img.numpy().squeeze()
             # ---------------------------------------------------
             corner_imgs = []
-            # block_size, ksize, k = 2, 3, 0.04
-            # corner_imgs.append(cv2.cornerHarris(img, block_size, ksize, k))
-            # block_size, ksize, k = 2, 3, 0.05
-            # corner_imgs.append(cv2.cornerHarris(img, block_size, ksize, k))
-            # block_size, ksize, k = 2, 3, 0.06
-            # corner_imgs.append(cv2.cornerHarris(img, block_size, ksize, k))
-            # block_size, ksize, k = 2, 3, 0.07
-            # corner_imgs.append(cv2.cornerHarris(img, block_size, ksize, k))
+            block_size, ksize, k = 2, 3, 0.04
+            corner_imgs.append(cv2.cornerHarris(img, block_size, ksize, k))
+            block_size, ksize, k = 3, 3, 0.04
+            corner_imgs.append(cv2.cornerHarris(img, block_size, ksize, k))
+            block_size, ksize, k = 4, 3, 0.04
+            corner_imgs.append(cv2.cornerHarris(img, block_size, ksize, k))
+            block_size, ksize, k = 5, 3, 0.04
+            corner_imgs.append(cv2.cornerHarris(img, block_size, ksize, k))
+
+            # Loop through each digit and its keypoints
+            for i, corner_img in enumerate(corner_imgs):
+                threshold = 0.01  # Adjust this value to change the threshold
+                # result is dilated for marking the corners, not important
+                corner_img = cv2.dilate(corner_img, None)
+                corner_img_thresholded = corner_img > threshold * corner_img.max()
+                # ---------------------------------------------------
+                color_img = cv2.cvtColor((img * 255).astype(np.uint8), cv2.COLOR_GRAY2BGR)
+                color_img[corner_img_thresholded] = [0, 0, 255]  # Mark the corners in red (assuming a color image)
+                # ---------------------------------------------------
+                corner_img = np.uint8(corner_img)
+                # find centroids
+                ret, labels, stats, centroids = cv2.connectedComponentsWithStats(corner_img)
+                # define the criteria to stop and refine the corners
+                criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.001)
+                corners = cv2.cornerSubPix(img, np.float32(centroids), (5, 5), (-1, -1), criteria)
+                res = np.hstack((centroids, corners))
+                res = np.int0(res)
+                color_img[res[:, 1], res[:, 0]] = [0, 0, 255]
+                color_img[res[:, 3], res[:, 2]] = [0, 255, 0]
+                # Compute the coordinates for placing the image on the canvas
+                x = (i % 2) * 28
+                y = (i // 2) * 28
+
+                # Place the image with keypoints on the canvas
+                canvas[y:y + 28, x:x + 28] = color_img
+
+            # ---------------------------------------------------
+            cv2.namedWindow('Canvas', cv2.WINDOW_NORMAL)
+            scale = 4  # Adjust this to change the size of the canvas
+            resized_canvas = cv2.resize(canvas, (canvas.shape[1] * scale, canvas.shape[0] * scale))
+            cv2.imshow('Canvas', resized_canvas)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+
+def show_4_shitomasi():
+    with open('config/training/training_configuration.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+
+    train_loader = DataLoader(MNISTDataset(train=True),
+                              batch_size=config["batch_size"],
+                              shuffle=False,
+                              num_workers=config["workers"])
+    # for imgs, _ in train_loader:
+    for imgs, _ in train_loader:
+        for img in imgs:
+            # Create a blank canvas to display the images
+            canvas = np.zeros((28 * 2, 28 * 2, 3), dtype=np.uint8)
+            # ---------------------------------------------------
+            img = img.numpy().squeeze()
+            # ---------------------------------------------------
+            corner_imgs = []
 
             # Set the parameters for Shi-Tomasi Corner Detector
             max_corners = None  # Maximum number of corners to detect
@@ -141,24 +195,127 @@ def show_4_corner():
             corner_imgs.append(np.int0(cv2.goodFeaturesToTrack(img, max_corners, quality_level, min_distance)))
             # Loop through each digit and its keypoints
             for i, corner_img in enumerate(corner_imgs):
-                # threshold = 0.01  # Adjust this value to change the threshold
-                # corner_img_thresholded = corner_img > threshold * corner_img.max()
                 # ---------------------------------------------------
-                color_img = cv2.cvtColor((img * 255).astype(np.uint8), cv2.COLOR_GRAY2BGR)
-                # color_img[corner_img_thresholded] = [0, 0, 255]  # Mark the corners in red (assuming a color image)
+                draw_in_square(canvas, corner_img, i, img)
+            # ---------------------------------------------------
+            cv2.namedWindow('Canvas', cv2.WINDOW_NORMAL)
+            scale = 4  # Adjust this to change the size of the canvas
+            resized_canvas = cv2.resize(canvas, (canvas.shape[1] * scale, canvas.shape[0] * scale))
+            cv2.imshow('Canvas', resized_canvas)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
 
-                # Compute the coordinates for placing the image on the canvas
-                x = (i % 2) * 28
-                y = (i // 2) * 28
 
-                # Place the image with keypoints on the canvas
-                canvas[y:y + 28, x:x + 28] = color_img
+def show_multiscale_shitomasi():
+    with open('config/training/training_configuration.yaml', 'r') as f:
+        config = yaml.safe_load(f)
 
-                for corner in corner_img:
-                    _x, _y = corner.ravel()
-                    # x = (i % 2) * 28
-                    # y = (i // 2) * 28
-                    cv2.circle(canvas[y:y + 28, x:x + 28], (_x, _y), 3, (0, 0, 255), -1)
+    train_loader = DataLoader(MNISTDataset(train=True),
+                              batch_size=config["batch_size"],
+                              shuffle=False,
+                              num_workers=config["workers"])
+    # for imgs, _ in train_loader:
+    for imgs, _ in train_loader:
+        for image in imgs:
+            image = image.numpy().squeeze()
+            max_corners = None  # Maximum number of corners to detect
+            quality_level = 0.01  # Quality level threshold
+            min_distance = 2  # Minimum distance between detected corners
+            block_size = 3  # Size of the neighborhood considered for corner detection
+            use_harris_detector = False  # Whether to use the Harris corner detector or not
+            k = 0.04  # Free parameter for the Harris detector
+            scale_factor = 1.2  # Scale factor between each level of the image pyramid (scale down)
+            num_levels = 3  # Number of levels in the image pyramid
+
+            # Create an image pyramid
+            pyramid = [image]  # Default size
+            for i in range(1, num_levels):
+                scaled = cv2.resize(pyramid[i - 1], (0, 0), fx=1 / scale_factor, fy=1 / scale_factor)
+                pyramid.append(scaled)
+
+            # Perform corner detection at each level of the pyramid
+            corners = []
+            for level, img in enumerate(pyramid):
+                # Apply corner detection
+                level_corners = cv2.goodFeaturesToTrack(image=img, maxCorners=max_corners,
+                                                        qualityLevel=quality_level,
+                                                        minDistance=min_distance,
+                                                        blockSize=block_size,
+                                                        useHarrisDetector=use_harris_detector, k=k)
+                if level_corners is not None:
+                    level_corners = level_corners.reshape(-1, 2)  # Reshape corner coordinates
+                    level_corners *= (scale_factor ** level)  # Scale the corners back to the original image size
+                    corners.extend(level_corners)
+
+            # Draw the detected corners on the image
+            color_img = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+            for corner in corners:
+                x, y = corner.astype(int)
+                cv2.circle(color_img, (x, y), 1,  (0, 0, 255), -1)
+
+            cv2.namedWindow("Multiscale Corner Detection", cv2.WINDOW_NORMAL)
+            cv2.resizeWindow("Multiscale Corner Detection", 280, 280)  # Set the desired window size
+
+            # Display the result
+            cv2.imshow("Multiscale Corner Detection", color_img)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+def show_4_multiscale_shitomasi():
+    with open('config/training/training_configuration.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+
+    train_loader = DataLoader(MNISTDataset(train=True),
+                              batch_size=config["batch_size"],
+                              shuffle=False,
+                              num_workers=config["workers"])
+    # for imgs, _ in train_loader:
+    for imgs, _ in train_loader:
+        for image in imgs:
+            # Create a blank canvas to display the images
+            canvas = np.zeros((28 * 2, 28 * 2, 3), dtype=np.uint8)
+            # ---------------------------------------------------
+            image = image.numpy().squeeze()
+            # ---------------------------------------------------
+            # corner_imgs = []
+            max_corners = None  # Maximum number of corners to detect
+            quality_level = 0.01  # Quality level threshold
+            min_distance = 2  # Minimum distance between detected corners
+            block_size = 3  # Size of the neighborhood considered for corner detection
+            use_harris_detector = False  # Whether to use the Harris corner detector or not
+            k = 0.04  # Free parameter for the Harris detector
+            scale_factor = 1.2  # Scale factor between each level of the image pyramid (scale down)
+            num_levels = 4  # Number of levels in the image pyramid
+
+            # Create an image pyramid
+            pyramid = [image]  # Default size
+            for i in range(1, num_levels):
+                scaled = cv2.resize(pyramid[i - 1], (0, 0), fx=1 / scale_factor, fy=1 / scale_factor)
+                pyramid.append(scaled)
+
+            # Perform corner detection at each level of the pyramid
+            for level, img in enumerate(pyramid):
+                # Apply corner detection
+                level_corners = cv2.goodFeaturesToTrack(image=img, maxCorners=max_corners,
+                                                        qualityLevel=quality_level,
+                                                        minDistance=min_distance,
+                                                        blockSize=block_size,
+                                                        useHarrisDetector=use_harris_detector, k=k)
+                if level_corners is not None:
+                    level_corners = level_corners.reshape(-1, 2)  # Reshape corner coordinates
+                    # level_corners *= (scale_factor ** level)  # Scale the corners back to the original image size
+                    draw_in_square(canvas, level_corners, level, img)
+
+            # Draw the detected corners on the image
+            # color_img = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+            # for corner in corners:
+            #     x, y = corner.astype(int)
+            #     cv2.circle(color_img, (x, y), 1,  (0, 0, 255), -1)
+            #
+            #
+            # for i, corner_img in enumerate(corner_imgs):
+            #     # ---------------------------------------------------
+            #     draw_in_square(canvas, corner_img, i, img)
 
             # ---------------------------------------------------
             cv2.namedWindow('Canvas', cv2.WINDOW_NORMAL)
@@ -169,9 +326,27 @@ def show_4_corner():
             cv2.destroyAllWindows()
 
 
+def draw_in_square(canvas, corner_img, i, img):
+    color_img = cv2.cvtColor((img * 255).astype(np.uint8), cv2.COLOR_GRAY2BGR)
+    # Compute the coordinates for placing the image on the canvas
+    x = (i % 2) * 28
+    y = (i // 2) * 28
+    # Place the image with keypoints on the canvas
+    padded_image = np.pad(color_img, ((0, 28-color_img.shape[0]), (0, 28-color_img.shape[1]), (0, 0)), mode='constant')
+    canvas[y:y + 28, x:x + 28] = padded_image
+    for corner in corner_img:
+        _x, _y = corner.ravel()
+        # x = (i % 2) * 28
+        # y = (i // 2) * 28
+        cv2.circle(canvas[y:y + 28, x:x + 28], (int(_x), int(_y)), 1, (0, 0, 255), -1)
+
+
 if __name__ == "__main__":
     # show_4()
-    show_4_corner()
+    # show_4_shitomasi()
+    # show_multiscale_shitomasi()
+    show_4_multiscale_shitomasi()
+    # show_4_harris()
 
 # 1 step - corner detection. Poi ci sono degli step che sopprimono feature troppo vicine alle altre
 # Anche globalmente, le feature stesse vengono clusterizzate e tengono feature distinte
