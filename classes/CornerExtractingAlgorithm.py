@@ -3,6 +3,8 @@ from typing import Callable
 
 import cv2
 import numpy as np
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 
 class CornerExtractingAlgorithm:
@@ -27,11 +29,30 @@ class CornerExtractingAlgorithm:
             # minDistance = 1  # Minimum distance between detected corners
             self._algorithm: Callable = cv2.cornerHarris
 
-    def __call__(self, image: np.ndarray, **kwargs):
+    def __call__(self, image, **kwargs):
         if not self.multi_scale:
             return self._algorithm(image, **kwargs)
         else:
             return self.__apply_multiscale(image, **kwargs)
+
+    def run(self, images: np.ndarray | DataLoader, shape: tuple[int, int] = (3, 3), **kwargs):
+        if isinstance(images, np.ndarray):
+            self.corner_to_vector(images, self(images, **kwargs), shape=shape)
+            return self(images, **kwargs)
+        elif isinstance(images, DataLoader):
+            self.logger.info(f"Extracting corners with {self.name} algorithm...")
+            vectors = []
+            for (x, _) in tqdm(images, desc=f"Generating corners and vectorized boxes using the {self.name} algorithm"):
+                # Make numpy -> Squeeze 1 (grayscale) dim -> go from float to 0-255 representation
+                imgs = (x.numpy().squeeze() * 255).astype(np.uint8)
+                for i in range(imgs.shape[0]):
+                    corners = self(imgs[i], **kwargs)
+                    vectors.append(self.corner_to_vector(imgs[i], corners, shape=shape))
+            self.logger.info("Corner extraction complete.")
+            return vectors
+
+        else:
+            raise ValueError("Invalid data type, either pass a single image as a numpy array or a dataloader of images")
 
     def __apply_multiscale(self, image: np.ndarray, num_levels: int = 4, scale_factor: float = 1.2, **kwargs):
         pyramid = [image]  # Default size
@@ -117,7 +138,8 @@ def main():
     corners = fea(image, **args)
     vectors = fea.corner_to_vector(image, corners, shape=(3, 3))
     print(vectors)
-    fea.plot(image, corners)
+    print(vectors / 255)
+    # fea.plot(image, corners)
 
 
 if __name__ == "__main__":
