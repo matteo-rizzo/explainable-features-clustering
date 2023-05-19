@@ -62,7 +62,8 @@ class CornerExtractingAlgorithm:
         start_y: int = y - half_height
         end_y: int = y + half_height + 1
 
-        box = image[start_x:end_x, start_y:end_y]
+        # images are accessed in y (row) and x (column)
+        box: np.ndarray = image[start_y:end_y, start_x:end_x]
 
         return box
 
@@ -72,8 +73,8 @@ class CornerExtractingAlgorithm:
         vectors = []
         for corner in corners:
             x, y = corner.astype(int) if self.multi_scale else corner.ravel().astype(int)
-            box = self.extract_boxes(image, (x, y), shape=shape)
-            flattened_box = box.flatten()
+            box: np.ndarray = self.extract_boxes(image, (x, y), shape=shape)
+            flattened_box: np.ndarray = box.flatten()
             vectors.append(flattened_box)
         return np.array(vectors)
 
@@ -81,7 +82,7 @@ class CornerExtractingAlgorithm:
         color_img = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         for corner in corners:
             x, y = corner.astype(int) if self.multi_scale else corner.ravel().astype(int)
-            cv2.circle(color_img, (x, y), 1, (0, 0, 255), -1)
+            cv2.circle(color_img, (x, y), 1, (0, 0, 255), 1)
 
         cv2.namedWindow(f"{self.name.title()} {'Multiscale' if self.multi_scale else ''} "
                         f"Corner Detection", cv2.WINDOW_NORMAL)
@@ -114,7 +115,7 @@ def main():
     # image = image / 255
     fea = CornerExtractingAlgorithm(algorithm="SHI-TOMASI", multi_scale=False)
     corners = fea(image, **args)
-    vectors = fea.corner_to_vector(image, corners, shape=(3,3))
+    vectors = fea.corner_to_vector(image, corners, shape=(3, 3))
     print(vectors)
     fea.plot(image, corners)
 
