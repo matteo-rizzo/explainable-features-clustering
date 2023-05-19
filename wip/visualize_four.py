@@ -345,8 +345,8 @@ if __name__ == "__main__":
     # show_4()
     # show_4_shitomasi()
     # show_multiscale_shitomasi()
-    show_4_multiscale_shitomasi()
-    # show_4_harris()
+    # show_4_multiscale_shitomasi()
+    show_4_harris()
 
 # 1 step - corner detection. Poi ci sono degli step che sopprimono feature troppo vicine alle altre
 # Anche globalmente, le feature stesse vengono clusterizzate e tengono feature distinte

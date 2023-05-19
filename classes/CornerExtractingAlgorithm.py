@@ -21,6 +21,7 @@ class CornerExtractingAlgorithm:
             # k = 0.04  # Free parameter for the Harris detector
             self._algorithm: Callable = cv2.goodFeaturesToTrack
         elif algorithm.upper() == "HARRIS":
+            raise NotImplementedError("Not all functions have been implemented for this method, sorry!")
             # maxCorners = None  # Maximum number of corners to detect
             # qualityLevel = 0.01  # Quality level threshold
             # minDistance = 1  # Minimum distance between detected corners
@@ -28,7 +29,7 @@ class CornerExtractingAlgorithm:
 
     def __call__(self, image: np.ndarray, **kwargs):
         if not self.multi_scale:
-            return self._algorithm(image=image, **kwargs)
+            return self._algorithm(image, **kwargs)
         else:
             return self.__apply_multiscale(image, **kwargs)
 
@@ -42,7 +43,7 @@ class CornerExtractingAlgorithm:
         corners = []
         for level, img in enumerate(pyramid):
             # Apply corner detection
-            level_corners = self._algorithm(image=img, **kwargs)
+            level_corners = self._algorithm(img, **kwargs)
             if level_corners is not None:
                 level_corners = level_corners.reshape(-1, 2)  # Reshape corner coordinates
                 level_corners *= (scale_factor ** level)  # Scale the corners back to the original image size
@@ -102,8 +103,16 @@ def main():
         "useHarrisDetector": False,  # Whether to use the Harris corner detector or not
         "k": 0.04  # Free parameter for the Harris detector
     }
+
+    # args = {
+    #     "blockSize": 2,  # Size of the neighborhood considered for corner detection
+    #     "ksize": 3,
+    #     "k": 0.04  # Free parameter for the Harris detector
+    # }
+
     image = cv2.imread("dataset/26.png", 0)  # Read the image in grayscale
-    fea = CornerExtractingAlgorithm(multi_scale=True)
+    # image = image / 255
+    fea = CornerExtractingAlgorithm(algorithm="SHI-TOMASI", multi_scale=False)
     corners = fea(image, **args)
     vectors = fea.corner_to_vector(image, corners, shape=(3,3))
     print(vectors)
