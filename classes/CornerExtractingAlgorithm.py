@@ -49,6 +49,33 @@ class CornerExtractingAlgorithm:
                 corners.extend(level_corners)
         return corners
 
+    @staticmethod
+    def extract_boxes(image: np.ndarray, coordinates: tuple[int, int], shape: tuple[int, int] = (3, 3)):
+        half_width: int = shape[0] // 2
+        half_height: int = shape[1] // 2
+
+        # for coord in coordinates:
+        x, y = coordinates
+        start_x: int = x - half_width
+        end_x: int = x + half_width + 1
+        start_y: int = y - half_height
+        end_y: int = y + half_height + 1
+
+        box = image[start_x:end_x, start_y:end_y]
+
+        return box
+
+    def corner_to_vector(self, image: np.ndarray,
+                         corners: np.ndarray | list,
+                         shape: tuple[int, int] = (3, 3)) -> np.ndarray:
+        vectors = []
+        for corner in corners:
+            x, y = corner.astype(int) if self.multi_scale else corner.ravel().astype(int)
+            box = self.extract_boxes(image, (x, y), shape=shape)
+            flattened_box = box.flatten()
+            vectors.append(flattened_box)
+        return np.array(vectors)
+
     def plot(self, image, corners):
         color_img = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         for corner in corners:
@@ -76,8 +103,10 @@ def main():
         "k": 0.04  # Free parameter for the Harris detector
     }
     image = cv2.imread("dataset/26.png", 0)  # Read the image in grayscale
-    fea = CornerExtractingAlgorithm(multi_scale=False)
+    fea = CornerExtractingAlgorithm(multi_scale=True)
     corners = fea(image, **args)
+    vectors = fea.corner_to_vector(image, corners, shape=(3,3))
+    print(vectors)
     fea.plot(image, corners)
 
 
