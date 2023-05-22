@@ -35,14 +35,15 @@ class CornerExtractingAlgorithm:
         else:
             return self.__apply_multiscale(image, **kwargs)
 
-    def run(self, images: np.ndarray | DataLoader, shape: tuple[int, int] = (3, 3), **kwargs):
+    def run(self, images: np.ndarray | DataLoader, shape: tuple[int, int], **kwargs):
         if isinstance(images, np.ndarray):
             self.corner_to_vector(images, self(images, **kwargs), shape=shape)
             return self(images, **kwargs)
         elif isinstance(images, DataLoader):
-            self.logger.info(f"Extracting corners with {self.name} algorithm...")
+            self.logger.info(f"Extracting corners with {self.name} algorithm "
+                             f"(vectorizing ({shape[0]},{shape[1]})) ...")
             vectors = []
-            for (x, _) in tqdm(images, desc=f"Generating corners and vectorized boxes using the {self.name} algorithm"):
+            for (x, _) in tqdm(images, desc=f"Generating corners and vectorized boxes"):
                 # Make numpy -> Squeeze 1 (grayscale) dim -> go from float to 0-255 representation
                 imgs = (x.numpy().squeeze() * 255).astype(np.uint8)
                 for i in range(imgs.shape[0]):
@@ -72,19 +73,25 @@ class CornerExtractingAlgorithm:
         return corners
 
     @staticmethod
-    def extract_boxes(image: np.ndarray, coordinates: tuple[int, int], shape: tuple[int, int] = (3, 3)):
+    def extract_boxes(image: np.ndarray, coordinates: tuple[int, int], shape: tuple[int, int]):
+
         half_width: int = shape[0] // 2
         half_height: int = shape[1] // 2
 
+        # Pad image 
+        padded_image = np.pad(image,
+                              [(half_width, half_width), (half_height, half_height)],
+                              'constant')
+
         # for coord in coordinates:
         x, y = coordinates
-        start_x: int = x - half_width
-        end_x: int = x + half_width + 1
-        start_y: int = y - half_height
-        end_y: int = y + half_height + 1
+        start_x: int = x  # (+ half_width for padding  - half_width to go left, cancel out)
+        end_x: int = x + (half_width * 2) + 1  # times 2 because of padding
+        start_y: int = y  # same as above
+        end_y: int = y + (half_height * 2) + 1  # same as above
 
         # images are accessed in y (row) and x (column)
-        box: np.ndarray = image[start_y:end_y, start_x:end_x]
+        box: np.ndarray = padded_image[start_y:end_y, start_x:end_x]
 
         return box
 
@@ -97,7 +104,7 @@ class CornerExtractingAlgorithm:
             box: np.ndarray = self.extract_boxes(image, (x, y), shape=shape)
             flattened_box: np.ndarray = box.flatten()
             vectors.append(flattened_box)
-        return np.array(vectors)
+        return np.array(vectors) / 255 # TODO: parametrize normalization?
 
     def plot(self, image, corners):
         color_img = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
@@ -138,7 +145,6 @@ def main():
     corners = fea(image, **args)
     vectors = fea.corner_to_vector(image, corners, shape=(3, 3))
     print(vectors)
-    print(vectors / 255)
     # fea.plot(image, corners)
 
 

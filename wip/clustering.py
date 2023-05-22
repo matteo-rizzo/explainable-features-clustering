@@ -40,7 +40,9 @@ def main():
 
     fea = CornerExtractingAlgorithm(algorithm="SHI-TOMASI", multi_scale=False, logger=logger)
     # FIXME: fishy, look again
-    flat_descriptors = np.concatenate(fea.run(train_loader, shape=(3, 3), **args))
+    descriptors = fea.run(train_loader, shape=(3, 3), **args)
+    # gather all descriptors in a single big array
+    flat_descriptors = np.concatenate(descriptors)
     # vectors = fea.corner_to_vector(image, corners, shape=(3, 3))
     # -- Reduction ---
     dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", logger=logger, **clustering_config["umap_args"])
