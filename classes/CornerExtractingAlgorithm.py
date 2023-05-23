@@ -1,5 +1,5 @@
 import logging
-from typing import Callable
+from typing import Callable, Union
 
 import cv2
 import numpy as np
@@ -35,7 +35,7 @@ class CornerExtractingAlgorithm:
         else:
             return self.__apply_multiscale(image, **kwargs)
 
-    def run(self, images: np.ndarray | DataLoader, shape: tuple[int, int], **kwargs):
+    def run(self, images: Union[np.ndarray, DataLoader], shape: tuple[int, int], **kwargs):
         if isinstance(images, np.ndarray):
             self.corner_to_vector(images, self(images, **kwargs), shape=shape)
             return self(images, **kwargs)
