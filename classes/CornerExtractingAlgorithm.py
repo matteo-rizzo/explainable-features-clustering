@@ -46,7 +46,7 @@ class CornerExtractingAlgorithm:
             for (x, _) in tqdm(images, desc=f"Generating corners and vectorized boxes"):
                 # Make numpy -> Squeeze 1 (grayscale) dim -> go from float to 0-255 representation
                 imgs = (x.numpy().squeeze() * 255).astype(np.uint8)
-                if len(imgs) == 1: # Batch size 1
+                if not len(imgs) > 2: # Batch size 1
                     corners = self(imgs, **kwargs)
                     vectors.append(self.corner_to_vector(imgs, corners, shape=shape))
                 else:
