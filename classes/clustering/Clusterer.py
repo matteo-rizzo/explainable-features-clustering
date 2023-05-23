@@ -1,5 +1,6 @@
 import logging
 import time
+from pathlib import Path
 
 import numpy as np
 import seaborn as sns
@@ -62,7 +63,7 @@ class Clusterer:
     def plot(vectors, labels, name: str = ""):
         sns.set(style="darkgrid")
         clustered = (labels >= 0)
-        plt.figure(figsize=(10, 10), dpi=300)
+        fig = plt.figure(figsize=(10, 10), dpi=300)
         plt.scatter(vectors[~clustered, 0],
                     vectors[~clustered, 1],
                     color=(0.5, 0.5, 0.5),
@@ -81,7 +82,8 @@ class Clusterer:
         # plt.scatter(flat_descriptors[:, 0], flat_descriptors[:, 1], c=labels)
         # plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=100, linewidths=3, c='k')
 
-        plt.show()
+        Path("plots").mkdir(exist_ok=True)
+        fig.savefig(f'plots/{name}_2d.png', dpi=fig.dpi)
 
 
     @staticmethod
@@ -108,5 +110,6 @@ class Clusterer:
 
         ax.set_title(name)
 
-        plt.show()
-        fig.savefig(f'{name}.png', dpi=fig.dpi)
+        # plt.show()
+        Path("plots").mkdir(exist_ok=True)
+        fig.savefig(f'plots/{name}_3d.png', dpi=fig.dpi)
