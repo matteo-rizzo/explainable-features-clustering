@@ -3,9 +3,8 @@ import time
 
 import numpy as np
 import seaborn as sns
-
 from matplotlib import pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+
 from functional.utils import print_minutes, log_on_default
 
 try:
@@ -24,8 +23,8 @@ log_on_default("INFO", f"Importing clustering algorithms with {DEVICE} support."
 
 class Clusterer:
     def __init__(self, algorithm: str, logger=logging.getLogger(__name__), **kwargs):
-        self.name: str = algorithm
-        self.logger = logger
+        self.__algorithm_name: str = algorithm
+        self.__logger = logger
         if algorithm.upper() == "HDBSCAN":
             self.__clusterer = HDBSCAN(**kwargs)
         elif algorithm.upper() == "HAC":
@@ -41,16 +40,16 @@ class Clusterer:
 
     def fit_predict(self, vectors: np.ndarray) -> np.ndarray:
         t0 = time.perf_counter()
-        self.logger.info(f"Running {self.name} fit_predict...")
+        self.__logger.info(f"Running {self.__algorithm_name} fit_predict...")
         cluster_labels = self.__clusterer.fit_predict(vectors)
-        print_minutes(seconds=(time.perf_counter() - t0), input_str=self.name, logger=self.logger)
+        print_minutes(seconds=(time.perf_counter() - t0), input_str=self.__algorithm_name, logger=self.__logger)
         return cluster_labels
 
     def fit(self, vectors: np.ndarray) -> None:
         t0 = time.perf_counter()
-        self.logger.info(f"Running {self.name} fit...")
+        self.__logger.info(f"Running {self.__algorithm_name} fit...")
         self.__clusterer.fit(vectors)
-        print_minutes(seconds=(time.perf_counter() - t0), input_str=self.name, logger=self.logger)
+        print_minutes(seconds=(time.perf_counter() - t0), input_str=self.__algorithm_name, logger=self.__logger)
 
     def score(self, vectors: np.ndarray) -> float:
         return self.__clusterer.score(vectors)

@@ -47,7 +47,7 @@ class Trainer:
                  logger: logging.Logger = logging.getLogger(__name__)):
         self.config: dict = config
         self.hyperparameters: dict = hyperparameters
-        self.logger: logging.Logger = logger
+        self.__logger: logging.Logger = logger
         self.__setup_logger()
         self.device: Optional[torch.device] = get_device(config["device"])
         # --- Training stuff ---
@@ -65,7 +65,7 @@ class Trainer:
         self.checkpoint = None
 
     def __setup_logger(self):
-        self.logger.setLevel(self.config["logger"])
+        self.__logger.setLevel(self.config["logger"])
         ch = logging.StreamHandler()
         ch.setLevel(self.config["logger"])
         formatter = colorlog.ColoredFormatter(
@@ -73,7 +73,7 @@ class Trainer:
             datefmt="%Y-%m-%d %H:%M:%S"
         )
         ch.setFormatter(formatter)
-        self.logger.addHandler(ch)
+        self.__logger.addHandler(ch)
 
     def train(self, train_dataloader: torch.utils.data.DataLoader,
               test_dataloader: torch.utils.data.DataLoader = None):
@@ -107,7 +107,7 @@ class Trainer:
         results = (0,) * len(self.metrics)
         self.scheduler.last_epoch = start_epoch - 1  # do not move
         self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
-        self.logger.info(
+        self.__logger.info(
             f'{colorstr("bright_green", "Batch size")}: {self.config["batch_size"]} '
             f'({self.config["nominal_batch_size"]} nominal)\t'
             f'{colorstr("bright_green", "Dataloader workers")}: {train_dataloader.num_workers}\t'
@@ -130,7 +130,7 @@ class Trainer:
             if (not self.config["notest"] or is_final_epoch) and test_dataloader:  # Calculate mAP
                 results = self.test(test_dataloader)
             if is_final_epoch and not test_dataloader:
-                self.logger.info("Test dataset was not given: skipping test...")
+                self.__logger.info("Test dataset was not given: skipping test...")
             # --- Write results ---
             with open(results_file, 'a') as ckpt:
                 ckpt.write(
@@ -147,7 +147,7 @@ class Trainer:
                 self.checkpoint = None
         # End training --------------------------------------------------------------------------
 
-        self.logger.info(f'{epoch - start_epoch + 1:g} epochs completed in {(time.time() - t0) / 3600:.3f} hours.\n')
+        self.__logger.info(f'{epoch - start_epoch + 1:g} epochs completed in {(time.time() - t0) / 3600:.3f} hours.\n')
 
         # --- Strip optimizers ---
         for ckpt in last_ckpt, best_ckpt:
@@ -186,8 +186,8 @@ class Trainer:
                        f"{colorstr('bold', 'yellow', 'Current lr')} : {current_lr:.3f} "
                        f"(-{self.optimizer.defaults['lr'] - current_lr:.3f})")
         # --------------------------------------------------
-        self.logger.info(epoch_desc)
-        self.logger.info(f"{'-' * 100}")
+        self.__logger.info(epoch_desc)
+        self.__logger.info(f"{'-' * 100}")
         results = [m.cpu().item() / batch_number for m in rolling_metrics]
         return results
 
@@ -277,7 +277,7 @@ class Trainer:
             self.config["architecture_config"] = ''
             self.config["weights"] = checkpoint
             self.config["resume"] = True
-            self.logger.info(f'Resuming training from {checkpoint}')
+            self.__logger.info(f'Resuming training from {checkpoint}')
 
         else:
             # Check files exist. The return is either the same path (if it was correct)
@@ -290,7 +290,7 @@ class Trainer:
             # Increment run
             self.config["save_dir"] = increment_path(Path(self.config["project"]) / self.config["name"],
                                                      exist_ok=self.config["exist_ok"])
-            self.logger.info(f'Starting a new training')
+            self.__logger.info(f'Starting a new training')
 
     def __init_dump_folder(self) -> [Path, Path, Path, Path, Path]:
         save_dir: Path = Path(f'{self.config["save_dir"]}')
@@ -313,17 +313,17 @@ class Trainer:
             self.checkpoint = torch.load(self.config["weights"], map_location=self.device)
             self.model = self.model_class(
                 config_path=self.config["architecture_config"] or self.checkpoint['model'].yaml,
-                logger=self.logger).to(self.device)
+                logger=self.__logger).to(self.device)
             state_dict = self.checkpoint['model'].float().state_dict()  # to FP32
             state_dict = intersect_dicts(state_dict, self.model.state_dict(), exclude=[])  # intersect
             self.model.load_state_dict(state_dict, strict=False)
-            self.logger.info(
+            self.__logger.info(
                 f'Transferred {len(state_dict):g}/{len(self.model.state_dict()):g} '
                 f'items from {self.config["weights"]}')
         # Else initialize a new model
         else:
             self.model = self.model_class(config_path=self.config["architecture_config"],
-                                          logger=self.logger).to(self.device)
+                                          logger=self.__logger).to(self.device)
 
     def __setup_gradient_accumulation(self) -> int:
         # If the total batch size is less than or equal to the nominal batch size, then accumulate is set to 1.
@@ -332,7 +332,7 @@ class Trainer:
         # Scale weight_decay
         self.hyperparameters['weight_decay'] *= (self.config["batch_size"] * accumulate
                                                  / self.config["nominal_batch_size"])
-        self.logger.info(f"Scaled weight_decay = {self.hyperparameters['weight_decay']}")
+        self.__logger.info(f"Scaled weight_decay = {self.hyperparameters['weight_decay']}")
         return accumulate
 
     def __setup_scheduler(self) -> torch.optim.lr_scheduler:
@@ -375,7 +375,7 @@ class Trainer:
             assert start_epoch > 0, f'{self.config["weights"]} training to ' \
                                     f'{self.config["epochs"]:g} epochs is finished, nothing to resume.'
         if self.config["epochs"] < start_epoch:
-            self.logger.info(
+            self.__logger.info(
                 f'{self.config["weights"]} has been trained for {self.checkpoint["epoch"]:g} epochs. '
                 f'Fine-tuning for {self.config["epochs"]:g} additional epochs.')
             self.config["epochs"] += self.checkpoint['epoch']  # finetune additional epoch
@@ -407,14 +407,14 @@ class Trainer:
             torch.save(checkpoint, weights_dir / f'epoch_{epoch:03d}.pt')
 
     def __print_model(self):
-        self.logger.info(f'{"idx":>1}{"params":>10}  {"module":<40}{"parameters":<30}')
-        self.logger.info(f'{"-" * 95}')
+        self.__logger.info(f'{"idx":>1}{"params":>10}  {"module":<40}{"parameters":<30}')
+        self.__logger.info(f'{"-" * 95}')
         for idx, module in enumerate(list(self.model.modules())[1:]):
             module_type = str(module.__class__)[8:-2]
             parameters = sum(dict((p.data_ptr(), p.numel()) for p in module.parameters()).values())
             arguments = str(module)[len(module_type.split(".")[-1]):]
-            self.logger.info(f'{idx:>3}{parameters:10.0f}  {module_type:<40}{arguments}')
-        self.logger.info(f'{"-" * 95}')
+            self.__logger.info(f'{idx:>3}{parameters:10.0f}  {module_type:<40}{arguments}')
+        self.__logger.info(f'{"-" * 95}')
 
 
 def main():

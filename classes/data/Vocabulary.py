@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 
 import cv2
 import numpy as np
@@ -22,7 +22,6 @@ class Vocabulary:
         self.__feature_extractor = FeatureExtractingAlgorithm()
 
     def match_words(self, x: np.ndarray, threshold: int = 0.8) -> List:
-        # match the features with the visual words using cross correlation
         matches = []
         if np.any(x != 0):
             for word in self.__words:
@@ -31,27 +30,27 @@ class Vocabulary:
                 matches.append(res)
         return matches
 
-    def embed(self, img: Tensor, window_size=(7, 7), stride=1) -> torch.Tensor:
-        embedding = []
-        (win_w, win_h) = window_size
-        img = normalize_img(img)
-        for i in range(0, img.shape[1] - win_w, stride):
-            for j in range(0, img.shape[0] - win_h, stride):
-                window = np.expand_dims(img[j:j + win_h, i:i + win_w], 0)
-                if np.any(window != 0):
-                    _, desc = self.__feature_extractor.run(window)
-                    if desc is None:
-                        hist = np.full((len(self.__words),), -1)
-                    else:
-                        matches = self.match_words(desc)
-                        hist, _ = np.histogram(np.argmax(matches, axis=1), bins=range(len(self.__words) + 1))
-                else:
-                    hist = np.full((len(self.__words),), -1)
-                embedding.append(hist)
+    def __embed_window(self, window: np.ndarray) -> np.ndarray:
+        if not np.any(window != 0):
+            return np.full((len(self.__words),), -1)
 
-        embedding = torch.flatten(torch.Tensor(embedding))
+        _, desc = self.__feature_extractor.run(window)
+        if desc is None:
+            return np.full((len(self.__words),), -1)
 
-        return embedding
+        matches = self.match_words(desc)
+        hist, _ = np.histogram(np.argmax(matches, axis=1), bins=range(len(self.__words) + 1))
+        return hist
 
-    def weight_by_importance(self, x: np.ndarray, importance_weights: np.ndarray) -> np.ndarray:
-        return np.dot(x, self.__words.T * importance_weights)
+    def embed(self, images: Tensor, window_size: Tuple = (7, 7), stride: int = 1) -> Tensor:
+        batched_embeddings, (win_w, win_h) = [], window_size
+        for batch_idx in range(images.shape[0]):
+            img = normalize_img(images[batch_idx]).squeeze()
+            img_embedding = []
+            for i in range(0, img.shape[1] - win_w, stride):
+                for j in range(0, img.shape[0] - win_h, stride):
+                    window = np.expand_dims(img[j:j + win_h, i:i + win_w], 0)
+                    window_embedding = self.__embed_window(window)
+                    img_embedding.append(window_embedding)
+            batched_embeddings.append(torch.flatten(torch.tensor(img_embedding)))
+        return torch.stack(batched_embeddings).unsqueeze(1).unsqueeze(1)

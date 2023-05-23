@@ -1,6 +1,7 @@
 import logging
 
 import numpy as np
+import torch
 import torchmetrics
 import yaml
 from matplotlib import pyplot as plt
@@ -24,12 +25,23 @@ EPOCHS = 15
 
 
 def main():
-    # -----------------------------------------------------------------------------------
     logger = logging.getLogger(__name__)
+
     with open('config/training/training_configuration.yaml', 'r') as f:
         config = yaml.safe_load(f)
     with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
-        hyp = yaml.safe_load(f)
+        hyperparameters = yaml.safe_load(f)
+
+    train = torch.utils.data.DataLoader(MNISTDataset(train=True),
+                                        batch_size=config["batch_size"],
+                                        shuffle=True,
+                                        num_workers=config["workers"],
+                                        drop_last=True)
+    test = torch.utils.data.DataLoader(MNISTDataset(train=False),
+                                       batch_size=config["batch_size"],
+                                       shuffle=True,
+                                       num_workers=config["workers"],
+                                       drop_last=True)
 
     metric_collection = MetricCollection({
         'accuracy': torchmetrics.Accuracy(task="multiclass", num_classes=10),
@@ -38,17 +50,11 @@ def main():
         "F1": torchmetrics.F1Score(task="multiclass", num_classes=10, average="macro")
     })
 
-    train_loader = DataLoader(MNISTDataset(train=True),
-                              batch_size=config["batch_size"],
-                              shuffle=False,
-                              num_workers=config["workers"])
-    test_loader = DataLoader(MNISTDataset(train=False),
-                             batch_size=config["batch_size"],
-                             shuffle=False,
-                             num_workers=config["workers"])
+    # trainer = Trainer(ImportanceWeightedCNN, config, hyperparameters, metric_collection, logger)
+    # trainer.train(train, test)
 
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT")
-    _, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
+    _, descriptors = key_points_extractor.get_keypoints_and_descriptors(train)
 
     clustering = KMeansClustering(n_clusters=10)
 
@@ -75,24 +81,25 @@ def main():
     for epoch in range(EPOCHS):
 
         running_loss, correct, total = 0.0, 0, 0
-        for i, (x, y) in tqdm(enumerate(train_loader), desc="Training epoch: {}".format(epoch)):
+        for i, (x, y) in tqdm(enumerate(train), desc="Training epoch: {}".format(epoch)):
             x, y = x.to(device), y.to(device)
             o = model.predict(x).to(device)
+            print(o.shape)
             loss = model.update_weights(o, y)
             running_loss += loss
             total, correct = model.get_accuracy(o, y, total, correct)
 
-        train_loss, train_accuracy = running_loss / len(train_loader), 100 * correct / total
+        train_loss, train_accuracy = running_loss / len(train), 100 * correct / total
 
         running_loss, correct, total = 0.0, 0, 0
-        for i, (x, y) in tqdm(enumerate(test_loader), desc="Testing epoch: {}".format(epoch)):
+        for i, (x, y) in tqdm(enumerate(test), desc="Testing epoch: {}".format(epoch)):
             x, y = x.to(device), y.to(device)
             o = model.predict(x).to(device)
             loss = model.get_loss(o, y)
             running_loss += loss
             total, correct = model.get_accuracy(o, y, total, correct)
 
-        test_loss, test_accuracy = running_loss / len(test_loader), 100 * correct / total
+        test_loss, test_accuracy = running_loss / len(test), 100 * correct / total
 
         print(f'Epoch [{epoch + 1:d}], '
               f'train loss: {train_loss:.3f}, '

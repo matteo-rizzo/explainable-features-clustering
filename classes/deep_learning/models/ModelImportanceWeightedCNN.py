@@ -19,8 +19,7 @@ class ModelImportanceWeightedCNN(TrainableModel):
         """
         Performs a prediction using the network and returns the output logits
         """
-        x = self.__vocabulary.embed(x.squeeze())
-        return self._network(x.float())
+        return self._network(self.__vocabulary.embed(x).float())
 
     def get_importance_weights(self) -> np.ndarray:
         return self._network.get_importance_weights()
