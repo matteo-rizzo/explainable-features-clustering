@@ -109,3 +109,4 @@ class Clusterer:
         ax.set_title(name)
 
         plt.show()
+        fig.savefig(f'{name}.png', dpi=fig.dpi)
