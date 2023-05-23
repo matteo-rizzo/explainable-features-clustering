@@ -12,9 +12,10 @@ class ImportanceWeightedCNN(CNN):
 
     def __init__(self, config_path: str = "config/architectures/importance_weighted_cnn.yaml",
                  logger: logging.Logger = logging.getLogger(__name__)):
-        super(ImportanceWeightedCNN, self).__init__(config_path=config_path,
-                                                    logger=logger)
-        self.__importance_weight = nn.Parameter(torch.ones(1, 1, 28, 28))
+        super(ImportanceWeightedCNN, self).__init__(config_path=config_path, logger=logger)
+        importance_weights = torch.rand((1, 1, 1, 4410))
+        importance_weights = importance_weights / importance_weights.sum()
+        self.__importance_weight = nn.Parameter(importance_weights)
 
     def forward(self, x: Tensor) -> Tensor:
         x = x * self.__importance_weight
