@@ -1,7 +1,7 @@
 # --- Training operative configuration ---
 device: "cuda:0" # Cuda device, i.e. 0 or 0,1,2,3 or cpu
 workers: 0 # Maximum number of dataloader workers
-batch_size: 2 # Total batch size for all GPUs
+batch_size: 1 # Total batch size for all GPUs
 nominal_batch_size: 100
 #img_size: # [train, test] image sizes
 #  - 28   # train
