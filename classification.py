@@ -6,11 +6,21 @@ import yaml
 from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
+from tqdm import tqdm
 
 from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.clustering.KMeansClustering import KMeansClustering
 from classes.data.MNISTDataset import MNISTDataset
-from classes.data.Vocabulary import Vocabulary
+from classes.deep_learning.models.ModelImportanceWeightedCNN import ModelImportanceWeightedCNN
+from functional.torch_utils import get_device
+
+PLOT = False
+NUM_WORDS = 10
+DEVICE_TYPE = "cpu"
+OPTIMIZER = "SGD"
+LEARNING_RATE = 0.01
+CRITERION = "CrossEntropyLoss"
+EPOCHS = 15
 
 
 def main():
@@ -20,6 +30,7 @@ def main():
         config = yaml.safe_load(f)
     with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
         hyp = yaml.safe_load(f)
+
     metric_collection = MetricCollection({
         'accuracy': torchmetrics.Accuracy(task="multiclass", num_classes=10),
         'precision': torchmetrics.Precision(task="multiclass", num_classes=10, average="macro"),
@@ -35,51 +46,59 @@ def main():
                              batch_size=config["batch_size"],
                              shuffle=False,
                              num_workers=config["workers"])
-    # -----------------------------------------------------------------------------------
-    # TODO: genetic algorithm to maximise these features?
-    # -----------------------------------------------------------------------------------
+
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT")
-    key_points, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
+    _, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
 
     clustering = KMeansClustering(n_clusters=10)
 
     flat_descriptors = np.concatenate(descriptors)
-    # reducer(flat_descriptors)
     clustering.fit(flat_descriptors)
     labels, centroids = clustering.get_labels(), clustering.get_centroids()
 
     # Plot the data points and centroids
-    plt.scatter(flat_descriptors[:, 0], flat_descriptors[:, 1], c=labels)
-    plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=100, linewidths=3, c='k')
-    plt.show()
+    if PLOT:
+        plt.scatter(flat_descriptors[:, 0], flat_descriptors[:, 1], c=labels)
+        plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=100, linewidths=3, c='k')
+        plt.show()
 
-    # TODO FROM HERE ON ------
     ranking = clustering.rank_clusters(flat_descriptors, centroids, labels)
-    words = centroids[ranking]
-    vocabulary = Vocabulary(words)
+    words = [centroids[cluster_label] for (cluster_label, _) in ranking[:NUM_WORDS]]
 
-    X, y = vocabulary.embed(train_loader)
-    # # -----------------------------------------------------------------------------------
-    # svm = LinearSVC()
-    # # train the machine learning model on the feature matrix and label vector
-    # svm.fit(X, y)
-    #
-    # # predict the labels of the training data
-    # y_pred = svm.predict(X)
-    #
-    # # evaluate the accuracy of the model
-    # acc = accuracy_score(y, y_pred)
-    #
-    # # compute the importance weights of the visual words using the learned coefficients
-    # importance_weights = np.abs(svm.coef_).sum(axis=0)
-    # # -----------------------------------------------------------------------------------
-    # # match the visual words with the features using dot product weighted by importance weights
-    # matches = Vocabulary.match(descriptors, importance_weights)
-    # # -----------------------------------------------------------------------------------
-    # trainer = Trainer(ImportanceWeightedCNN, config=config, hyperparameters=hyp,
-    #                   metric_collection=metric_collection, logger=logger)
-    # trainer.train(train_dataloader=train_loader, test_dataloader=test_loader)
-    # # -----------------------------------------------------------------------------------
+    device = get_device(DEVICE_TYPE)
+
+    model = ModelImportanceWeightedCNN(device, words)
+    model.set_optimizer(OPTIMIZER, LEARNING_RATE)
+    model.set_criterion(CRITERION)
+    model.train_mode()
+
+    for epoch in range(EPOCHS):
+
+        running_loss, correct, total = 0.0, 0, 0
+        for i, (x, y) in tqdm(enumerate(train_loader), desc="Training epoch: {}".format(epoch)):
+            x, y = x.to(device), y.to(device)
+            o = model.predict(x).to(device)
+            loss = model.update_weights(o, y)
+            running_loss += loss
+            total, correct = model.get_accuracy(o, y, total, correct)
+
+        train_loss, train_accuracy = running_loss / len(train_loader), 100 * correct / total
+
+        running_loss, correct, total = 0.0, 0, 0
+        for i, (x, y) in tqdm(enumerate(test_loader), desc="Testing epoch: {}".format(epoch)):
+            x, y = x.to(device), y.to(device)
+            o = model.predict(x).to(device)
+            loss = model.get_loss(o, y)
+            running_loss += loss
+            total, correct = model.get_accuracy(o, y, total, correct)
+
+        test_loss, test_accuracy = running_loss / len(test_loader), 100 * correct / total
+
+        print(f'Epoch [{epoch + 1:d}], '
+              f'train loss: {train_loss:.3f}, '
+              f'train accuracy: {train_accuracy:.3f}, '
+              f'test loss: {test_loss:.3f}, '
+              f'test accuracy: {test_accuracy:.3f}')
 
 
 if __name__ == "__main__":

@@ -1,4 +1,3 @@
-import os
 import time
 
 from torch.utils.data import Dataset, DataLoader
@@ -11,6 +10,7 @@ Original dataset: https://yann.lecun.com/exdb/mnist/
 CSV version: https://www.kaggle.com/datasets/oddrationale/mnist-in-csv
 PNG version: https://github.com/myleott/mnist_png/blob/master/mnist_png.tar.gz
 """
+
 
 # PATH_TO_DATASET = os.path.join("dataset", "mnist", "images")
 

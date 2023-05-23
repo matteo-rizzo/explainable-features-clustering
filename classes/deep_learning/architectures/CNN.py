@@ -12,17 +12,17 @@ class CNN(nn.Module):
         super(CNN, self).__init__()
         # ----------------------------------------------------------
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=16,
-                               kernel_size=5, stride=1, padding=2)
+                               kernel_size=2, stride=1, padding=2)
         self.relu1 = nn.ReLU()
         self.pool1 = nn.MaxPool2d(kernel_size=2)
         # ----------------------------------------------------------
         self.conv2 = nn.Conv2d(in_channels=16, out_channels=32,
-                               kernel_size=5, stride=1, padding=2)
+                               kernel_size=2, stride=1, padding=2)
         self.relu2 = nn.ReLU()
         self.pool2 = nn.MaxPool2d(kernel_size=2)
         # ----------------------------------------------------------
         self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(in_features=32 * 7 * 7, out_features=10)
+        self.fc1 = nn.Linear(in_features=70656, out_features=10)
         # self.relu3 = nn.ReLU()
         # self.fc2 = nn.Linear(in_features=128, out_features=10)
         # ----------------------------------------------------------

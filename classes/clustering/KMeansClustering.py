@@ -1,6 +1,7 @@
 import itertools
 from typing import List, Tuple
 
+import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import sklearn
@@ -98,13 +99,12 @@ def main():
     dataloader = list(itertools.islice(dataloader, sample_size))
 
     sift = FeatureExtractingAlgorithm()
-    descriptors, paths_to_file = [], []
-    for (x, _, path_to_file) in tqdm(dataloader, desc="Generating descriptors using SIFT"):
-        img = x.squeeze(0).permute(1, 2, 0).numpy()
-        _, img_descriptors = sift.run(img)
-        if img_descriptors is not None:
-            descriptors.append(img_descriptors)
-            paths_to_file.append(path_to_file)
+    descriptors = []
+    for (x, y) in tqdm(dataloader, desc="Generating descriptors using SIFT"):
+        img = cv2.normalize(x.squeeze(0).permute(1, 2, 0).numpy(), None, 0, 255, cv2.NORM_MINMAX).astype('uint8')
+        kp, des = sift.run(img)
+        if des is not None:
+            descriptors.append(des)
 
     flat_descriptors = np.concatenate(descriptors)
 
@@ -118,14 +118,14 @@ def main():
     clusters_ranking = clustering.rank_clusters(flat_descriptors, clusters_centroids, clusters_labels)
 
     clustered_data, idx = [], 0
-    for img_descriptors, path_to_file in tqdm(zip(descriptors, paths_to_file), desc="Packing data"):
+    for img_descriptors in tqdm(descriptors, desc="Packing data"):
         if img_descriptors is None:
             continue
         num_img_des = img_descriptors.shape[0]
         des_clusters_labels = clusters_labels[idx:idx + num_img_des]
         des_clusters_rankings = [rank for i in des_clusters_labels for (j, rank) in clusters_ranking if i == j]
         print(des_clusters_labels, des_clusters_rankings)
-        img_data = (des_clusters_labels, des_clusters_rankings, path_to_file, img_descriptors)
+        img_data = (des_clusters_labels, des_clusters_rankings, img_descriptors)
         clustered_data.append(img_data)
         idx += num_img_des
 

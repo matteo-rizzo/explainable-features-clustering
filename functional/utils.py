@@ -5,6 +5,13 @@ import re
 from pathlib import Path
 
 import colorlog
+import numpy as np
+from torch import Tensor
+
+
+def normalize_img(img: Tensor) -> np.ndarray:
+    return (img.numpy() * 255).astype(np.uint8)
+
 
 def intersect_dicts(dict_a: dict, dict_b: dict, exclude=()):
     # Dictionary intersection of matching keys and shapes, omitting 'exclude' keys, using dict_a values

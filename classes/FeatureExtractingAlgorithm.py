@@ -105,7 +105,7 @@ class FeatureExtractingAlgorithm:
         descriptors, keypoints = [], []
         for (x, _) in tqdm(dataloader, desc=f"Generating keypoints and descriptors using {self.name}"):
             # Make numpy -> Squeeze 1 (grayscale) dim -> go from float to 0-255 representation
-            imgs = (x.numpy().squeeze() * 255).astype(np.uint8)
+            imgs = (x.numpy().squeeze(0) * 255).astype(np.uint8)
             for i in range(imgs.shape[0]):
                 img_keypoints, img_descriptors = self.run(imgs[i])
                 if img_descriptors is not None:
