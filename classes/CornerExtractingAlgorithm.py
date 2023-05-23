@@ -11,8 +11,8 @@ class CornerExtractingAlgorithm:
     def __init__(self, algorithm: str = "SHI-TOMASI",
                  multi_scale: bool = False,
                  logger: logging.Logger = logging.getLogger(__name__)):
-        self.__logger: logging.Logger = logger
-        self.__algorithm_name: str = algorithm
+        self.logger: logging.Logger = logger
+        self.name: str = algorithm
         self.multi_scale: bool = multi_scale
         if algorithm.upper() == "SHI-TOMASI":
             # maxCorners  = None  # Maximum number of corners to detect
@@ -35,21 +35,25 @@ class CornerExtractingAlgorithm:
         else:
             return self.__apply_multiscale(image, **kwargs)
 
-    def run(self, images: Union[np.ndarray, DataLoader], shape: tuple[int, int], **kwargs):
+    def run(self, images: np.ndarray | DataLoader, shape: tuple[int, int], **kwargs):
         if isinstance(images, np.ndarray):
             self.corner_to_vector(images, self(images, **kwargs), shape=shape)
             return self(images, **kwargs)
         elif isinstance(images, DataLoader):
-            self.__logger.info(f"Extracting corners with {self.__algorithm_name} algorithm "
-                               f"(vectorizing ({shape[0]},{shape[1]})) ...")
+            self.logger.info(f"Extracting corners with {self.name} algorithm "
+                             f"(vectorizing ({shape[0]},{shape[1]})) ...")
             vectors = []
             for (x, _) in tqdm(images, desc=f"Generating corners and vectorized boxes"):
                 # Make numpy -> Squeeze 1 (grayscale) dim -> go from float to 0-255 representation
                 imgs = (x.numpy().squeeze() * 255).astype(np.uint8)
-                for i in range(imgs.shape[0]):
-                    corners = self(imgs[i], **kwargs)
-                    vectors.append(self.corner_to_vector(imgs[i], corners, shape=shape))
-            self.__logger.info("Corner extraction complete.")
+                if len(imgs.shape) == 2: # Batch size 1
+                    corners = self(imgs, **kwargs)
+                    vectors.append(self.corner_to_vector(imgs, corners, shape=shape))
+                else:
+                    for i in range(imgs.shape[0]):
+                        corners = self(imgs[i], **kwargs)
+                        vectors.append(self.corner_to_vector(imgs[i], corners, shape=shape))
+            self.logger.info("Corner extraction complete.")
             return vectors
 
         else:
@@ -112,14 +116,13 @@ class CornerExtractingAlgorithm:
             x, y = corner.astype(int) if self.multi_scale else corner.ravel().astype(int)
             cv2.circle(color_img, (x, y), 1, (0, 0, 255), 1)
 
-        cv2.namedWindow(f"{self.__algorithm_name.title()} {'Multiscale' if self.multi_scale else ''} "
+        cv2.namedWindow(f"{self.name.title()} {'Multiscale' if self.multi_scale else ''} "
                         f"Corner Detection", cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(f"{self.__algorithm_name.title()} {'Multiscale' if self.multi_scale else ''} "
+        cv2.resizeWindow(f"{self.name.title()} {'Multiscale' if self.multi_scale else ''} "
                          f"Corner Detection", 512, 512)  # Set the desired window size
 
         # Display the result
-        cv2.imshow(f"{self.__algorithm_name.title()} {'Multiscale' if self.multi_scale else ''} Corner Detection",
-                   color_img)
+        cv2.imshow(f"{self.name.title()} {'Multiscale' if self.multi_scale else ''} Corner Detection", color_img)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
