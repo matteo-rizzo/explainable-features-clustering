@@ -1,0 +1,7 @@
+"maxCorners": null  # Maximum number of corners to detect
+"qualityLevel": 0.01  # Quality level threshold
+"minDistance": 2  # Minimum distance between detected corners
+"blockSize": 3  # Size of the neighborhood considered for corner detection
+"useHarrisDetector": False  # Whether to use the Harris corner detector or not
+"k": 0.04  # Free parameter for the Harris detector
+"shape": [3, 3]

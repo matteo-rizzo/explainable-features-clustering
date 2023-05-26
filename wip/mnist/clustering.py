@@ -2,6 +2,7 @@ import yaml
 from torch.utils.data import DataLoader
 
 from classes.CornerExtractingAlgorithm import CornerExtractingAlgorithm
+from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.clustering.Clusterer import Clusterer
 from classes.clustering.DimensionalityReducer import DimensionalityReducer
 from classes.data.MNISTDataset import MNISTDataset
@@ -14,6 +15,8 @@ def main():
         generic_config: dict = yaml.safe_load(f)
     with open('config/clustering/clustering_params.yaml', 'r') as f:
         clustering_config: dict = yaml.safe_load(f)
+    with open('config/feature_extraction.yaml', 'r') as f:
+        feature_extraction_config: dict = yaml.safe_load(f)
     # --- Logger ---
     logger = default_logger(generic_config["logger"])
     # --- Dataset ---
@@ -28,19 +31,12 @@ def main():
     # key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
     # keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
     # flat_descriptors = np.concatenate(descriptors)
-
-    args = {
-        "maxCorners": None,  # Maximum number of corners to detect
-        "qualityLevel": 0.01,  # Quality level threshold
-        "minDistance": 2,  # Minimum distance between detected corners
-        "blockSize": 3,  # Size of the neighborhood considered for corner detection
-        "useHarrisDetector": False,  # Whether to use the Harris corner detector or not
-        "k": 0.04  # Free parameter for the Harris detector
-    }
-
-    fea = CornerExtractingAlgorithm(algorithm="SHI-TOMASI", multi_scale=False, logger=logger)
-    # FIXME: fishy, look again
-    descriptors = fea.run(train_loader, shape=(3, 3), **args)
+    # fea = CornerExtractingAlgorithm(algorithm="SHI-TOMASI", multi_scale=False, logger=logger)
+    with open('config/feature_extraction.yaml', 'r') as f:
+        feature_extraction_config: dict = yaml.safe_load(f)
+    fea = FeatureExtractingAlgorithm(algorithm="SHI-TOMASI_BOX", multi_scale=False,
+                                     logger=logger, **feature_extraction_config)
+    keypoints, descriptors = fea.get_keypoints_and_descriptors(train_loader)
     # gather all descriptors in a single big array
     flat_descriptors = np.concatenate(descriptors)
     # vectors = fea.corner_to_vector(image, corners, shape=(3, 3))

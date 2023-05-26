@@ -188,8 +188,8 @@ def main():
     # --- Config ---
     with open('config/training/training_configuration.yaml', 'r') as f:
         generic_config: dict = yaml.safe_load(f)
-    with open('config/clustering/clustering_params.yaml', 'r') as f:
-        clustering_config: dict = yaml.safe_load(f)
+    with open('config/feature_extraction.yaml', 'r') as f:
+        feature_extraction_config: dict = yaml.safe_load(f)
     # --- Logger ---
     logger = default_logger(generic_config["logger"])
     # --- Dataset ---
@@ -199,12 +199,11 @@ def main():
                               num_workers=generic_config["workers"])
     # -----------------------------------------------------------------------------------
     # --- Keypoint extraction and feature description ---
-    key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
+    # key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
+    key_points_extractor = FeatureExtractingAlgorithm(algorithm="SHI-TOMASI_BOX", multi_scale=False,
+                                     logger=logger, **feature_extraction_config)
     keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
     flat_descriptors = np.concatenate(descriptors)
-    # -- Reduction ---
-    dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", logger=logger, **clustering_config["umap_args"])
-    reduced_vectors = dimensionality_reducer.fit_transform(flat_descriptors)
 
     find_optimal_n_clusters("KMEANS", flat_descriptors, logger)
 

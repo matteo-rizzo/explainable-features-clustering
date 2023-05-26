@@ -7,12 +7,14 @@ from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from classes.CornerExtractingAlgorithm import CornerExtractingAlgorithm
 from functional.utils import normalize_img
 
 
 class FeatureExtractingAlgorithm:
 
-    def __init__(self, algorithm: str = "SIFT", logger: logging.Logger = logging.getLogger(__name__), **kwargs):
+    def __init__(self, algorithm: str = "SIFT", logger: logging.Logger = logging.getLogger(__name__),
+                 multi_scale: bool = False, **kwargs):
         """
         :param algorithm: name of feature extraction algorithm to be used must be one of the following:
         "SIFT", "ORB", "KAZE", "AKAZE", "FREAK", "BRISK", "AGAST"
@@ -54,20 +56,28 @@ class FeatureExtractingAlgorithm:
             "BRISK": cv2.BRISK_create,
             # (Adaptive and Generic Accelerated Segment Test): A variant of FAST corner detector that is adaptive to
             # different image structures and performs well on noisy images.
-            "AGAST": cv2.AgastFeatureDetector_create
+            "AGAST": cv2.AgastFeatureDetector_create,
+            # TODO: notes
+            "SHI-TOMASI_BOX": CornerExtractingAlgorithm(algorithm="SHI-TOMASI", multi_scale=multi_scale, logger=logger, **kwargs)
         }
 
         if self.__algorithm_name not in self.__algorithms.keys():
-            raise ValueError("Invalid algorithm selected. Must be one of: {}".format(self.__algorithms.keys()))
-        self.__algorithm = self.__algorithms[self.__algorithm_name](**kwargs)
+            raise ValueError(f"Invalid algorithm selected. Must be one of: {self.__algorithms.keys()}")
+        if self.__algorithm_name == "SHI-TOMASI_BOX":
+            self.__algorithm = self.__algorithms[self.__algorithm_name]
+        else:
+            self.__algorithm = self.__algorithms[self.__algorithm_name](**kwargs)
 
     def run(self, img: np.ndarray) -> Tuple[Tuple, Optional[np.ndarray]]:
         if self.__algorithm_name in ["MSER", "FAST", "AGAST"]:
             return self.__algorithm.detect(img, None), None
+        elif self.__algorithm_name == "SHI-TOMASI_BOX":
+            return self.__algorithm.run(img)
         else:
             return self.__algorithm.detectAndCompute(img, None)
 
     @staticmethod
+
     def plot_keypoints(img: np.ndarray, keypoints: Tuple):
         plt.imshow(cv2.drawKeypoints(img, keypoints, None))
         plt.show()
@@ -83,3 +93,7 @@ class FeatureExtractingAlgorithm:
                     keypoints.append(img_keypoints)
                     descriptors.append(img_descriptors)
         return keypoints, descriptors
+
+
+if __name__ == "__main__":
+    FeatureExtractingAlgorithm("SHI-TOMASI")

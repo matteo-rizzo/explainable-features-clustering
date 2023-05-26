@@ -1,5 +1,5 @@
 import logging
-from typing import Callable, Union
+from typing import Callable
 
 import cv2
 import numpy as np
@@ -10,10 +10,14 @@ from tqdm import tqdm
 class CornerExtractingAlgorithm:
     def __init__(self, algorithm: str = "SHI-TOMASI",
                  multi_scale: bool = False,
-                 logger: logging.Logger = logging.getLogger(__name__)):
+                 shape: tuple[int, int] = (3,3),
+                 logger: logging.Logger = logging.getLogger(__name__),
+                 **kwargs):
         self.logger: logging.Logger = logger
         self.name: str = algorithm
         self.multi_scale: bool = multi_scale
+        self.box_shape: tuple[int, int] = shape
+        self.kwargs = kwargs
         if algorithm.upper() == "SHI-TOMASI":
             # maxCorners  = None  # Maximum number of corners to detect
             # qualityLevel  = 0.01  # Quality level threshold
@@ -29,32 +33,36 @@ class CornerExtractingAlgorithm:
             # minDistance = 1  # Minimum distance between detected corners
             self._algorithm: Callable = cv2.cornerHarris
 
-    def __call__(self, image, **kwargs):
+    def __call__(self, image):
         if not self.multi_scale:
-            return self._algorithm(image, **kwargs)
+            return self._algorithm(image, **self.kwargs)
         else:
-            return self.__apply_multiscale(image, **kwargs)
+            return self.__apply_multiscale(image, **self.kwargs)
 
-    def run(self, images: np.ndarray | DataLoader, shape: tuple[int, int], **kwargs):
+    def run(self, images: np.ndarray | DataLoader):
         if isinstance(images, np.ndarray):
-            self.corner_to_vector(images, self(images, **kwargs), shape=shape)
-            return self(images, **kwargs)
+            corners = self(images)
+            descriptors = self.corner_to_vector(images, corners, shape=self.box_shape)
+            return corners, descriptors
         elif isinstance(images, DataLoader):
             self.logger.info(f"Extracting corners with {self.name} algorithm "
-                             f"(vectorizing ({shape[0]},{shape[1]})) ...")
-            vectors = []
+                             f"(vectorizing ({self.box_shape[0]},{self.box_shape[1]})) ...")
+            corners = []
+            descriptors = []
             for (x, _) in tqdm(images, desc=f"Generating corners and vectorized boxes"):
                 # Make numpy -> Squeeze 1 (grayscale) dim -> go from float to 0-255 representation
                 imgs = (x.numpy().squeeze() * 255).astype(np.uint8)
-                if len(imgs.shape) == 2: # Batch size 1
-                    corners = self(imgs, **kwargs)
-                    vectors.append(self.corner_to_vector(imgs, corners, shape=shape))
+                if len(imgs.shape) == 2:  # Batch size 1
+                    img_corners = self(imgs)
+
+                    descriptors.append(self.corner_to_vector(imgs, img_corners, shape=self.box_shape))
                 else:
                     for i in range(imgs.shape[0]):
-                        corners = self(imgs[i], **kwargs)
-                        vectors.append(self.corner_to_vector(imgs[i], corners, shape=shape))
+                        img_corners = self(imgs[i])
+                        corners.append(img_corners)
+                        descriptors.append(self.corner_to_vector(imgs[i], img_corners, shape=self.box_shape))
             self.logger.info("Corner extraction complete.")
-            return vectors
+            return corners, descriptors
 
         else:
             raise ValueError("Invalid data type, either pass a single image as a numpy array or a dataloader of images")
@@ -108,7 +116,7 @@ class CornerExtractingAlgorithm:
             box: np.ndarray = self.extract_boxes(image, (x, y), shape=shape)
             flattened_box: np.ndarray = box.flatten()
             vectors.append(flattened_box)
-        return np.array(vectors) / 255 # TODO: parametrize normalization?
+        return np.array(vectors) / 255  # TODO: parametrize normalization?
 
     def plot(self, image, corners):
         color_img = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
@@ -145,8 +153,8 @@ def main():
 
     image = cv2.imread("dataset/26.png", 0)  # Read the image in grayscale
     # image = image / 255
-    fea = CornerExtractingAlgorithm(algorithm="SHI-TOMASI", multi_scale=False)
-    corners = fea(image, **args)
+    fea = CornerExtractingAlgorithm(algorithm="SHI-TOMASI", multi_scale=False, **args)
+    corners = fea(image)
     vectors = fea.corner_to_vector(image, corners, shape=(3, 3))
     print(vectors)
     # fea.plot(image, corners)
