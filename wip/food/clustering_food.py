@@ -42,7 +42,7 @@ def main():
     # TODO: genetic algorithm to maximise these features?
     # -----------------------------------------------------------------------------------
     # --- Keypoint extraction and feature description ---
-    key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
+    key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", nfeatures=400, logger=logger)
     keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader, rgb=True)
     flat_descriptors = np.concatenate(descriptors)
     # -- Reduction ---
