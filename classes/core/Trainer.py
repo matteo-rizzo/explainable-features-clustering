@@ -208,7 +208,13 @@ class Trainer:
             inputs, n_integrated_batches = self.__warmup_batch(inputs, batch_number, epoch, idx, warmup_number)
             with amp.autocast(enabled=self.device.type[:4] == "cuda"):
                 # --- Forward pass ---
-                preds = self.model(inputs)
+                if hasattr(self.model, 'predict'):
+                    # For "Model" classes
+                    preds = self.model.predict(inputs)
+                else:
+                    # For "raw" models (only for debugging, usually)
+                    preds = self.model(inputs)
+
                 loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
 
                 # --- Backward ---
