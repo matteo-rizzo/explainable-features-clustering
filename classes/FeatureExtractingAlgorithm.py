@@ -58,7 +58,8 @@ class FeatureExtractingAlgorithm:
             # different image structures and performs well on noisy images.
             "AGAST": cv2.AgastFeatureDetector_create,
             # TODO: notes
-            "SHI-TOMASI_BOX": CornerExtractingAlgorithm(algorithm="SHI-TOMASI", multi_scale=multi_scale, logger=logger, **kwargs)
+            "SHI-TOMASI_BOX": CornerExtractingAlgorithm(algorithm="SHI-TOMASI", multi_scale=multi_scale, logger=logger,
+                                                        **kwargs)
         }
 
         if self.__algorithm_name not in self.__algorithms.keys():
@@ -77,17 +78,18 @@ class FeatureExtractingAlgorithm:
             return self.__algorithm.detectAndCompute(img, None)
 
     @staticmethod
-
     def plot_keypoints(img: np.ndarray, keypoints: Tuple):
         plt.imshow(cv2.drawKeypoints(img, keypoints, None))
         plt.show()
         plt.clf()
 
-    def get_keypoints_and_descriptors(self, data: DataLoader) -> Tuple[List, List]:
+    def get_keypoints_and_descriptors(self, data: DataLoader, rgb: bool = False) -> Tuple[List, List]:
         descriptors, keypoints = [], []
         for (images, _) in tqdm(data, desc=f"Generating keypoints and descriptors using {self.__algorithm_name}"):
             for i in range(images.shape[0]):
                 img = normalize_img(images[i]).squeeze()
+                if rgb:
+                    img = cv2.cvtColor(img.transpose((1, 2, 0)), cv2.COLOR_RGB2BGR)
                 img_keypoints, img_descriptors = self.run(img)
                 if img_descriptors is not None:
                     keypoints.append(img_keypoints)
