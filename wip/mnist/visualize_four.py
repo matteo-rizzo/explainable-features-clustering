@@ -342,8 +342,8 @@ def draw_in_square(canvas, corner_img, i, img):
 
 
 if __name__ == "__main__":
-    # show_4()
-    show_4_shitomasi()
+    show_4()
+    # show_4_shitomasi()
     # show_multiscale_shitomasi()
     # show_4_multiscale_shitomasi()
     # show_4_harris()

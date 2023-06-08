@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
+from tqdm import tqdm
 
 from functional.utils import print_minutes, log_on_default
 
@@ -58,8 +59,27 @@ class Clusterer:
     def get_estimator(self):
         return self.__clusterer
 
+    def get_centroids(self):
+        # FIXME: add "if it exists" (density based don't have it)
+        return self.__clusterer.cluster_centers_
+
     @staticmethod
-    def plot(vectors, labels, name: str = ""):
+    def rank_clusters(data: np.ndarray, centroids: np.ndarray, labels: list | np.ndarray, print_values: bool = False) -> list[tuple]:
+        clusters_ranking = []
+        for i in tqdm(range(np.max(labels) + 1), desc="Ranking clusters"):
+            cluster_variance = np.var(data[labels == i], axis=0)
+            cluster_distance = np.linalg.norm(data[labels == i] - centroids[i], axis=1)
+            clusters_ranking.append((i, np.sum(cluster_variance) / np.sum(cluster_distance)))
+
+        clusters_ranking = sorted(clusters_ranking, key=lambda x: x[1], reverse=True)
+        if print_values:
+            for i, ranking in enumerate(clusters_ranking):
+                print(f"[{i}] Cluster {ranking[0]}: Importance Score = {ranking[1]}")
+
+        return clusters_ranking
+
+    @staticmethod
+    def plot(vectors, labels, name: str = "", save: bool = False):
         sns.set(style="darkgrid")
         clustered = (labels >= 0)
         fig = plt.figure(figsize=(10, 10), dpi=300)
@@ -81,12 +101,15 @@ class Clusterer:
         # plt.scatter(flat_descriptors[:, 0], flat_descriptors[:, 1], c=labels)
         # plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=100, linewidths=3, c='k')
 
-        Path("plots").mkdir(exist_ok=True)
-        fig.savefig(f'plots/{name}_2d.png', dpi=fig.dpi)
+        if save:
+            Path("plots").mkdir(exist_ok=True)
+            fig.savefig(f'plots/{name}_2d.png', dpi=fig.dpi)
+        else:
+            plt.show()
 
 
     @staticmethod
-    def plot_3d(vectors, labels, name: str = ""):
+    def plot_3d(vectors, labels, name: str = "", save: bool = False):
         sns.set(style="darkgrid")
         clustered = (labels >= 0)
 
@@ -109,6 +132,8 @@ class Clusterer:
 
         ax.set_title(name)
 
-        # plt.show()
-        Path("plots").mkdir(exist_ok=True)
-        fig.savefig(f'plots/{name}_3d.png', dpi=fig.dpi)
+        if save:
+            Path("plots").mkdir(exist_ok=True)
+            fig.savefig(f'plots/{name}_3d.png', dpi=fig.dpi)
+        else:
+            plt.show()

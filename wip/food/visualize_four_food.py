@@ -162,5 +162,5 @@ def count():
 
 
 if __name__ == "__main__":
-    # show_4()
-    count()
+    show_4()
+    # count()

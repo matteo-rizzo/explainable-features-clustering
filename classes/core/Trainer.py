@@ -18,6 +18,7 @@ from tqdm import tqdm
 
 from classes.data.MNISTDataset import MNISTDataset
 from classes.deep_learning.architectures.ImportanceWeightedCNN import ImportanceWeightedCNN
+from classes.deep_learning.models.TrainableModel import TrainableModel
 from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from classes.factories.OptimizerFactory import OptimizerFactory
@@ -40,7 +41,7 @@ def fitness(x: np.ndarray) -> float:
 
 class Trainer:
 
-    def __init__(self, model_class: Type[nn.Module],
+    def __init__(self, model_class: Type[TrainableModel],
                  config: dict,
                  hyperparameters: dict,
                  metric_collection: MetricCollection,

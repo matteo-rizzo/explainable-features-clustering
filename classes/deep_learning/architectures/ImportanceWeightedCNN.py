@@ -15,6 +15,7 @@ class ImportanceWeightedCNN(CNN):
     def __init__(self, config_path: str = CONFIG_PATH, logger: logging.Logger = logging.getLogger(__name__)):
         super(ImportanceWeightedCNN, self).__init__(config_path=config_path, logger=logger)
 
+        # FIXME: should have a different shape. Also not rand; do a smart initialization
         importance_weights = torch.rand((1, 1, 1, 4410))
         importance_weights = importance_weights / importance_weights.sum()
         self.__importance_weights = nn.Parameter(importance_weights)
