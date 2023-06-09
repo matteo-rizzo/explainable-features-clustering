@@ -1,3 +1,5 @@
+import logging
+import os
 from typing import Union, Dict, Tuple, List
 
 import numpy as np
@@ -8,10 +10,14 @@ from classes.data.Vocabulary import Vocabulary
 from classes.deep_learning.architectures.ImportanceWeightedCNN import ImportanceWeightedCNN
 from classes.deep_learning.models.TrainableModel import TrainableModel
 
+CONFIG_PATH = os.path.join("config", "architectures", "importance_weighted_cnn.yaml")
+
 
 class ModelImportanceWeightedCNN(TrainableModel):
 
-    def __init__(self, device: torch.device, words: List[float]):
+    def __init__(self,  device: torch.device, words: List[float]):
+        # TODO: there are too many conflicts with the rest right now.
+        raise NotImplementedError
         super().__init__(device, ImportanceWeightedCNN())
         self.__vocabulary = Vocabulary(words)
 

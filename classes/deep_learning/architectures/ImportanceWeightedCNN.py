@@ -12,13 +12,14 @@ CONFIG_PATH = os.path.join("config", "architectures", "importance_weighted_cnn.y
 
 class ImportanceWeightedCNN(CNN):
 
-    def __init__(self, config_path: str = CONFIG_PATH, logger: logging.Logger = logging.getLogger(__name__)):
-        super(ImportanceWeightedCNN, self).__init__(config_path=config_path, logger=logger)
+    def __init__(self, **kwargs):
+        super(ImportanceWeightedCNN, self).__init__()
 
         # FIXME: should have a different shape. Also not rand; do a smart initialization
-        importance_weights = torch.rand((1, 1, 1, 4410))
-        importance_weights = importance_weights / importance_weights.sum()
-        self.__importance_weights = nn.Parameter(importance_weights)
+        self.__importance_weights = nn.Parameter(torch.ones(1, 1, 28, 28))
+        # importance_weights = torch.rand((1, 1, 1, 4410))
+        # importance_weights = importance_weights / importance_weights.sum()
+        # self.__importance_weights = nn.Parameter(importance_weights)
 
     def forward(self, x: Tensor) -> Tensor:
         return super().forward(x * self.__importance_weights)

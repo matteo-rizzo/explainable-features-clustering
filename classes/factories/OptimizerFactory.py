@@ -11,10 +11,10 @@ class OptimizerFactory:
                              # momentum=hyperparameters['momentum'],
                              momentum=0.97,
                              nesterov=True),
-            # "Adam": optim.Adam(network_parameters, lr=hyperparameters["lr0"],
-            #                   betas=(hyperparameters['momentum'], 0.999)),
-            # "AdamW": optim.AdamW(network_parameters, lr=hyperparameters["lr0"],
-            #                     betas=(hyperparameters['momentum'], 0.999)),
+            "Adam": optim.Adam(network_parameters, lr=hyperparameters["lr0"],
+                              betas=(hyperparameters['momentum'], 0.999)),
+            "AdamW": optim.AdamW(network_parameters, lr=hyperparameters["lr0"],
+                                betas=(hyperparameters['momentum'], 0.999)),
         }
 
     def get(self, optimizer_type: str) -> torch.optim:

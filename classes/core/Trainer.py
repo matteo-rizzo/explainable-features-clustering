@@ -17,7 +17,9 @@ from torchmetrics import MetricCollection
 from tqdm import tqdm
 
 from classes.data.MNISTDataset import MNISTDataset
+from classes.deep_learning.architectures.CNN import CNN
 from classes.deep_learning.architectures.ImportanceWeightedCNN import ImportanceWeightedCNN
+from classes.deep_learning.models.ModelImportanceWeightedCNN import ModelImportanceWeightedCNN
 from classes.deep_learning.models.TrainableModel import TrainableModel
 from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
@@ -41,7 +43,7 @@ def fitness(x: np.ndarray) -> float:
 
 class Trainer:
 
-    def __init__(self, model_class: Type[TrainableModel],
+    def __init__(self, model_class: Type[nn.Module],
                  config: dict,
                  hyperparameters: dict,
                  metric_collection: MetricCollection,
@@ -209,12 +211,12 @@ class Trainer:
             inputs, n_integrated_batches = self.__warmup_batch(inputs, batch_number, epoch, idx, warmup_number)
             with amp.autocast(enabled=self.device.type[:4] == "cuda"):
                 # --- Forward pass ---
-                if hasattr(self.model, 'predict'):
-                    # For "Model" classes
-                    preds = self.model.predict(inputs)
-                else:
-                    # For "raw" models (only for debugging, usually)
-                    preds = self.model(inputs)
+                # if hasattr(self.model, 'predict'):
+                #     # For "Model" classes
+                #     preds = self.model.predict(inputs)
+                # else:
+                #     # For "raw" models (only for debugging, usually)
+                preds = self.model(inputs)
 
                 loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
 
@@ -320,7 +322,8 @@ class Trainer:
             self.checkpoint = torch.load(self.config["weights"], map_location=self.device)
             self.model = self.model_class(
                 config_path=self.config["architecture_config"] or self.checkpoint['model'].yaml,
-                logger=self.__logger).to(self.device)
+                logger=self.__logger,
+                ).to(self.device)
             state_dict = self.checkpoint['model'].float().state_dict()  # to FP32
             state_dict = intersect_dicts(state_dict, self.model.state_dict(), exclude=[])  # intersect
             self.model.load_state_dict(state_dict, strict=False)
@@ -448,7 +451,7 @@ def main():
         "F1": torchmetrics.F1Score(task="multiclass", num_classes=10, average="macro")
     })
 
-    trainer = Trainer(ImportanceWeightedCNN, config=config, hyperparameters=hyp,
+    trainer = Trainer(CNN, config=config, hyperparameters=hyp,
                       metric_collection=metric_collection, logger=logger)
     trainer.train(train, test)
 

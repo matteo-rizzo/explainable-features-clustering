@@ -22,36 +22,6 @@ class Food101Dataset(Dataset):
         return len(self.food101)
 
 
-def create_stratified_subset(dataset, num_samples):
-    class_distribution = {}  # Dictionary to store class counts
-    class_indices = {}  # Dictionary to store class indices
-    num_classes = len(dataset.dataset.food101.classes)
-    count = set()
-    for i in range(num_classes):
-        class_distribution[i] = 0
-        class_indices[i] = []
-    # Step 1: Calculate class distribution
-    for i, (_, label) in tqdm(enumerate(dataset), total=len(dataset)):
-        label = label.item()
-        if class_distribution[label] < num_samples:
-            class_distribution[label] += 1
-            class_indices[label].append(i)
-        else:
-            count.add(label)
-        if len(count) == num_classes:
-            break
-
-    # Step 3: Initialize empty lists
-    selected_indices = []
-    for indices_list in class_indices.values():
-        selected_indices.extend(indices_list)
-
-    print(selected_indices)
-    # Step 4: Create the subset dataset
-    subset = Subset(dataset, selected_indices)
-
-    return subset
-
 
 def main():
     pass
