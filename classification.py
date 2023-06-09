@@ -14,8 +14,10 @@ from classes.clustering.Clusterer import Clusterer
 from classes.clustering.DimensionalityReducer import DimensionalityReducer
 from classes.clustering.KMeansClustering import KMeansClustering
 from classes.core.Trainer import Trainer
+from classes.data.Food101Dataset import Food101Dataset
 from classes.data.MNISTDataset import MNISTDataset
 from classes.deep_learning.models.ModelImportanceWeightedCNN import ModelImportanceWeightedCNN
+from functional.data_utils import create_stratified_splits
 from functional.torch_utils import get_device
 
 PLOT = False
@@ -40,18 +42,30 @@ def main():
     with open('config/clustering/clustering_params.yaml', 'r') as f:
         clustering_config: dict = yaml.safe_load(f)
     # --- Data loaders ---
-    train_loader = torch.utils.data.DataLoader(MNISTDataset(train=True),
+    # train_loader = torch.utils.data.DataLoader(MNISTDataset(train=True),
+    #                                     batch_size=config["batch_size"],
+    #                                     shuffle=True,
+    #                                     num_workers=config["workers"],
+    #                                     drop_last=True)
+    # test_loader = torch.utils.data.DataLoader(MNISTDataset(train=False),
+    #                                    batch_size=config["batch_size"],
+    #                                    shuffle=True,
+    #                                    num_workers=config["workers"],
+    #                                    drop_last=True)
+
+    # TODO: Working on a subsample
+    train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True),
+                                                         n_splits=1, train_size=700, test_size=300)
+    train_loader = torch.utils.data.DataLoader(train_subset,
                                         batch_size=config["batch_size"],
                                         shuffle=True,
                                         num_workers=config["workers"],
                                         drop_last=True)
-    test_loader = torch.utils.data.DataLoader(MNISTDataset(train=False),
+    test_loader = torch.utils.data.DataLoader(test_subset,
                                        batch_size=config["batch_size"],
                                        shuffle=True,
                                        num_workers=config["workers"],
                                        drop_last=True)
-
-
 
     # --- Feature extraction ---
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SHI-TOMASI_BOX", multi_scale=False,

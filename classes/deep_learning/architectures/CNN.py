@@ -22,21 +22,26 @@ class CNN(nn.Module):
         # # self.relu3 = nn.ReLU()
         # # self.fc2 = nn.Linear(in_features=128, out_features=10)
         # # ----------------------------------------------------------
+        num_pool: int = 0
         # ----------------------------------------------------------
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=16,
-                               kernel_size=5, stride=1, padding=2)
+
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=16,
+                               kernel_size=7, stride=1, padding=3)
         self.relu1 = nn.ReLU()
         self.pool1 = nn.MaxPool2d(kernel_size=2)
+        num_pool += 1
         # ----------------------------------------------------------
         self.conv2 = nn.Conv2d(in_channels=16, out_channels=32,
-                               kernel_size=5, stride=1, padding=2)
+                               kernel_size=7, stride=1, padding=3)
         self.relu2 = nn.ReLU()
         self.pool2 = nn.MaxPool2d(kernel_size=2)
+        num_pool += 1
         # ----------------------------------------------------------
         self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(in_features=32 * 7 * 7, out_features=10)
-        # self.relu3 = nn.ReLU()
-        # self.fc2 = nn.Linear(in_features=128, out_features=10)
+        # Adjust the input size of the fully connected layer
+        # Calculate the feature map size after the second pooling layer
+        feature_map_size = 224 // (2 ** num_pool)  # divided by 2 for each max-pooling layers
+        self.fc1 = nn.Linear(in_features=32 * feature_map_size * feature_map_size, out_features=101)
         # ----------------------------------------------------------
 
     def forward(self, x: Tensor) -> Tensor:

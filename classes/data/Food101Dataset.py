@@ -7,19 +7,19 @@ from tqdm import tqdm
 
 class Food101Dataset(Dataset):
     def __init__(self, root: str = "dataset", train: bool = True):
-        self.food101 = Food101(root=root, split="train" if train else "test", download=True)
+        self.data = Food101(root=root, split="train" if train else "test", download=True)
         self.transform = Compose([
             Resize((224, 224)),
             ToTensor()
         ])
 
     def __getitem__(self, index):
-        img, label = self.food101[index]
+        img, label = self.data[index]
         img = self.transform(img)
         return img, label
 
     def __len__(self):
-        return len(self.food101)
+        return len(self.data)
 
 
 

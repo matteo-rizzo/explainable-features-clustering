@@ -44,14 +44,14 @@ PNG version: https://github.com/myleott/mnist_png/blob/master/mnist_png.tar.gz
 
 class MNISTDataset(Dataset):
     def __init__(self, root: str = "dataset", train: bool = True):
-        self.mnist = MNIST(root=root, train=train, download=True)
+        self.data = MNIST(root=root, train=train, download=True)
 
     def __getitem__(self, index):
-        img, label = self.mnist[index]
+        img, label = self.data[index]
         return ToTensor()(img), label
 
     def __len__(self):
-        return len(self.mnist)
+        return len(self.data)
 
 
 if __name__ == "__main__":

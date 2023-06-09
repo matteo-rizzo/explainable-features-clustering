@@ -16,6 +16,7 @@ from torch.utils.data import Dataset
 from torchmetrics import MetricCollection
 from tqdm import tqdm
 
+from classes.data.Food101Dataset import Food101Dataset
 from classes.data.MNISTDataset import MNISTDataset
 from classes.deep_learning.architectures.CNN import CNN
 from classes.deep_learning.architectures.ImportanceWeightedCNN import ImportanceWeightedCNN
@@ -24,6 +25,7 @@ from classes.deep_learning.models.TrainableModel import TrainableModel
 from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from classes.factories.OptimizerFactory import OptimizerFactory
+from functional.data_utils import create_stratified_splits
 from functional.lr_schedulers import linear_lrs, one_cycle_lrs
 from functional.torch_utils import strip_optimizer, get_device
 from functional.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run, colorstr
@@ -435,20 +437,44 @@ def main():
     with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
         hyp = yaml.safe_load(f)
 
-    train = torch.utils.data.DataLoader(MNISTDataset(train=True),
+    # train = torch.utils.data.DataLoader(MNISTDataset(train=True),
+    #                                     batch_size=config["batch_size"],
+    #                                     shuffle=True,
+    #                                     num_workers=config["workers"])
+    # test = torch.utils.data.DataLoader(MNISTDataset(train=False),
+    #                                    batch_size=config["batch_size"],
+    #                                    shuffle=True,
+    #                                    num_workers=config["workers"])
+
+    # train = torch.utils.data.DataLoader(Food101Dataset(train=True),
+    #                                     batch_size=config["batch_size"],
+    #                                     shuffle=True,
+    #                                     num_workers=config["workers"],
+    #                                     drop_last=True)
+    # test = torch.utils.data.DataLoader(Food101Dataset(train=False),
+    #                                    batch_size=config["batch_size"],
+    #                                    shuffle=True,
+    #                                    num_workers=config["workers"],
+    #                                    drop_last=True)
+
+    train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True),
+                                                         n_splits=1, train_size=10000, test_size=500)
+    train = torch.utils.data.DataLoader(train_subset,
                                         batch_size=config["batch_size"],
                                         shuffle=True,
-                                        num_workers=config["workers"])
-    test = torch.utils.data.DataLoader(MNISTDataset(train=False),
+                                        num_workers=config["workers"],
+                                        drop_last=True)
+    test = torch.utils.data.DataLoader(test_subset,
                                        batch_size=config["batch_size"],
                                        shuffle=True,
-                                       num_workers=config["workers"])
+                                       num_workers=config["workers"],
+                                       drop_last=True)
 
     metric_collection = MetricCollection({
-        'accuracy': torchmetrics.Accuracy(task="multiclass", num_classes=10),
-        'precision': torchmetrics.Precision(task="multiclass", num_classes=10, average="macro"),
-        'recall': torchmetrics.Recall(task="multiclass", num_classes=10, average="macro"),
-        "F1": torchmetrics.F1Score(task="multiclass", num_classes=10, average="macro")
+        'accuracy': torchmetrics.Accuracy(task="multiclass", num_classes=101),
+        'precision': torchmetrics.Precision(task="multiclass", num_classes=101, average="macro"),
+        'recall': torchmetrics.Recall(task="multiclass", num_classes=101, average="macro"),
+        "F1": torchmetrics.F1Score(task="multiclass", num_classes=101, average="macro")
     })
 
     trainer = Trainer(CNN, config=config, hyperparameters=hyp,
