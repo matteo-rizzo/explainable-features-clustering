@@ -1,7 +1,7 @@
 # ---------- Data configuration ----------
-num_classes: 10
-img_size: 28
-num_channels: 1
+num_classes: 101
+img_size: 224
+num_channels: 3
 
 # --- Training operative configuration ---
 device: "cuda:0" # Cuda device, i.e. 0 or 0,1,2,3 or cpu
