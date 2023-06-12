@@ -1,0 +1,31 @@
+---
+flip:
+  p: 0.5
+rotation:
+  degrees: [0, 270]
+  p: 0.1
+random_affine:
+  degrees: [30, 60]
+  translate: [0.1, 0.3]
+  scale: [0.7, 0.9]
+  p: 0.1
+elastic_transform:
+  alpha: 80.0
+  p: 0.1
+random_crop:
+  size: [128, 128]
+  p: 0.1
+color_jitter:
+  brightness: 0.5
+  hue: 0.0
+  p: 0.1
+gaussian_blur:
+  kernel_size: [5, 9]
+  sigma: [0.1, 2]
+  p: 0.1
+random_erasing:
+  scale: [0.02, 0.12]
+  p: 0.0
+random_perspective:
+  distortion_scale: 0.3
+  p: 0.1

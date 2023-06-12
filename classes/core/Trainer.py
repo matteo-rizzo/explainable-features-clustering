@@ -14,18 +14,13 @@ import yaml
 from torch.cuda import amp
 from torch.utils.data import Dataset
 from torchmetrics import MetricCollection
-from torchvision.models import convnext_tiny, convnext_base, convnext_small
 from tqdm.auto import tqdm
 
-from classes.data.Food101Dataset import Food101Dataset
 from classes.data.MNISTDataset import MNISTDataset
-from classes.deep_learning.architectures.CNN import CNN
 from classes.deep_learning.architectures.SmarterCNN import SmarterCNN
-from classes.deep_learning.architectures.VGG16 import VGG16
 from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from classes.factories.OptimizerFactory import OptimizerFactory
-from functional.data_utils import create_stratified_splits
 from functional.lr_schedulers import linear_lrs, one_cycle_lrs
 from functional.torch_utils import strip_optimizer, get_device
 from functional.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run, colorstr
@@ -119,6 +114,9 @@ class Trainer:
             f'({self.config["nominal_batch_size"]} nominal)\t'
             f'{colorstr("bright_green", "Dataloader workers")}: {train_dataloader.num_workers}\t'
             f'{colorstr("bright_green", "Saving results to")}: {save_dir}\n'
+            f'{" " * 31}{colorstr("bright_green", "Optimizer")}: {self.config["optimizer"]}\t'
+            f'{colorstr("bright_green", "Learning rate")}: {self.hyperparameters["lr0"]}\t'
+            f'{colorstr("bright_green", "Placeholder")}: {"XXX"}\n'
             f'{" " * 31}{colorstr("bright_green", "Starting training for")} '
             f'{self.config["epochs"]} epochs...')
 
@@ -134,7 +132,8 @@ class Trainer:
             self.scheduler.step()
             # self.exponential_moving_average.update_attr(self.model, include=[.....])
             is_final_epoch: bool = epoch + 1 == self.config["epochs"]
-            if (not self.config["notest"] or is_final_epoch) and test_dataloader:  # Calculate mAP
+            if (not self.config["notest"] or is_final_epoch) and test_dataloader:
+                self.test(train_dataloader, on_train=True)
                 results = self.test(test_dataloader)
             if is_final_epoch and not test_dataloader:
                 self.__logger.info("Test dataset was not given: skipping test...")
@@ -163,12 +162,12 @@ class Trainer:
         torch.cuda.empty_cache()
         return results
 
-    def test(self, test_dataloader: torch.utils.data.DataLoader):
+    def test(self, dataloader: torch.utils.data.DataLoader, on_train: bool = False):
         # --- Disable training ---
         self.model.eval()
         # --- Console logging ---
-        batch_number: int = len(test_dataloader)
-        progress_bar = tqdm(enumerate(test_dataloader), total=batch_number)
+        batch_number: int = len(dataloader)
+        progress_bar = tqdm(enumerate(dataloader), total=batch_number)
         rolling_metrics = [torch.tensor(0.0, device=self.device), ] * len(self.metrics)
         # --------------------------------------------------
         for idx, (inputs, targets) in progress_bar:
@@ -178,25 +177,26 @@ class Trainer:
                 preds = self.model(inputs)
                 result_dict = self.metrics(preds, targets)
                 rolling_metrics = [x + y for x, y in zip(rolling_metrics, result_dict.values())]
-                batch_desc = f"{colorstr('bold', 'white', '[TEST]')}\t"
+                batch_desc = f"{colorstr('bold', 'white', '[TEST]' if not on_train else '[TRAIN]')}\t"
                 for metric_name, metric_value in zip(result_dict.keys(), rolling_metrics):
                     batch_desc += f"{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
                                   f"{metric_value / (idx + 1):.3f}\t"
                 progress_bar.set_description(batch_desc)
         # --------------------------------------------------
-        current_lr: float = self.optimizer.param_groups[0]['lr']
-        epoch_desc = f"{colorstr('bold', 'white', '[Metrics]')} "
-        for metric_name, metric_value in zip(result_dict.keys(), rolling_metrics):
-            epoch_desc += f"\t{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
-                          f"{metric_value / batch_number :.3f}"
-        epoch_desc += (f"\t{colorstr('bold', 'white', '[Parameters]')} "
-                       f"{colorstr('bold', 'yellow', 'Current lr')} : {current_lr:.3f} "
-                       f"(-{self.optimizer.defaults['lr'] - current_lr:.3f})")
-        # --------------------------------------------------
-        self.__logger.info(epoch_desc)
-        self.__logger.info(f"{'-' * 100}")
-        results = [m.cpu().item() / batch_number for m in rolling_metrics]
-        return results
+        if not on_train:
+            current_lr: float = self.optimizer.param_groups[0]['lr']
+            epoch_desc = f"{colorstr('bold', 'white', '[Test Metrics]')} "
+            for metric_name, metric_value in zip(result_dict.keys(), rolling_metrics):
+                epoch_desc += f"\t{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
+                              f"{metric_value / batch_number :.3f}"
+            epoch_desc += (f"\t{colorstr('bold', 'white', '[Parameters]')} "
+                           f"{colorstr('bold', 'yellow', 'Current lr')} : {current_lr:.3f} "
+                           f"(-{self.optimizer.defaults['lr'] - current_lr:.3f})")
+            # --------------------------------------------------
+            self.__logger.info(epoch_desc)
+            # self.__logger.info(f"{'-' * 100}")
+            results = [m.cpu().item() / batch_number for m in rolling_metrics]
+            return results
 
     def __train_one_epoch(self, train_dataloader: torch.utils.data.DataLoader, epoch: int):
         # --- Enable training ---
@@ -441,14 +441,14 @@ def main():
     with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
         hyp = yaml.safe_load(f)
 
-    # train = torch.utils.data.DataLoader(MNISTDataset(train=True),
-    #                                     batch_size=train_config["batch_size"],
-    #                                     shuffle=True,
-    #                                     num_workers=train_config["workers"])
-    # test = torch.utils.data.DataLoader(MNISTDataset(train=False),
-    #                                    batch_size=train_config["batch_size"],
-    #                                    shuffle=True,
-    #                                    num_workers=train_config["workers"])
+    train = torch.utils.data.DataLoader(MNISTDataset(train=True),
+                                        batch_size=train_config["batch_size"],
+                                        shuffle=True,
+                                        num_workers=train_config["workers"])
+    test = torch.utils.data.DataLoader(MNISTDataset(train=False),
+                                       batch_size=train_config["batch_size"],
+                                       shuffle=True,
+                                       num_workers=train_config["workers"])
 
     # train = torch.utils.data.DataLoader(Food101Dataset(train=True),
     #                                     batch_size=train_config["batch_size"],
@@ -461,18 +461,20 @@ def main():
     #                                    num_workers=train_config["workers"],
     #                                    drop_last=True)
 
-    train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True),
-                                                         n_splits=1, train_size=10000, test_size=1000)
-    train = torch.utils.data.DataLoader(train_subset,
-                                        batch_size=train_config["batch_size"],
-                                        shuffle=True,
-                                        num_workers=train_config["workers"],
-                                        drop_last=True)
-    test = torch.utils.data.DataLoader(test_subset,
-                                       batch_size=train_config["batch_size"],
-                                       shuffle=True,
-                                       num_workers=train_config["workers"],
-                                       drop_last=True)
+    # train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=True),
+    #                                                      n_splits=1,
+    #                                                      train_size=10000,
+    #                                                      test_size=1000,)
+    # train = torch.utils.data.DataLoader(train_subset,
+    #                                     batch_size=train_config["batch_size"],
+    #                                     shuffle=True,
+    #                                     num_workers=train_config["workers"],
+    #                                     drop_last=True)
+    # test = torch.utils.data.DataLoader(test_subset,
+    #                                    batch_size=train_config["batch_size"],
+    #                                    shuffle=True,
+    #                                    num_workers=train_config["workers"],
+    #                                    drop_last=True)
 
     metric_collection = MetricCollection({
         'accuracy': torchmetrics.Accuracy(task="multiclass", num_classes=train_config["num_classes"]),
@@ -483,7 +485,7 @@ def main():
     })
     trainer = Trainer(SmarterCNN, config=train_config, hyperparameters=hyp,
                       metric_collection=metric_collection, logger=logger)
-    trainer.train(train, test, num_classes = train_config["num_classes"])
+    trainer.train(train, test, num_classes=train_config["num_classes"])
 
 
 if __name__ == "__main__":
