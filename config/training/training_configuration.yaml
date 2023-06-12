@@ -6,8 +6,8 @@ num_channels: 3
 # --- Training operative configuration ---
 device: "cuda:0" # Cuda device, i.e. 0 or 0,1,2,3 or cpu
 workers: 0 # Maximum number of dataloader workers
-batch_size: 256 # Total batch size for all GPUs
-nominal_batch_size: 256
+batch_size: 80 # Total batch size for all GPUs
+nominal_batch_size: 80
 epochs: 100 # Number of training epochs
 
 optimizer: "AdamW" # [SGD ,Adam ,AdamW ]

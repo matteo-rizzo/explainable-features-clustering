@@ -14,15 +14,13 @@ import yaml
 from torch.cuda import amp
 from torch.utils.data import Dataset
 from torchmetrics import MetricCollection
+from torchvision.models import convnext_small, resnet50
 from tqdm.auto import tqdm
 
 from classes.data.Food101Dataset import Food101Dataset
-from classes.data.MNISTDataset import MNISTDataset
-from classes.deep_learning.architectures.SmarterCNN import SmarterCNN
 from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from classes.factories.OptimizerFactory import OptimizerFactory
-from functional.data_utils import create_stratified_splits
 from functional.lr_schedulers import linear_lrs, one_cycle_lrs
 from functional.torch_utils import strip_optimizer, get_device
 from functional.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run, colorstr
@@ -85,8 +83,8 @@ class Trainer:
         save_dir, weights_dir, last_ckpt, best_ckpt, results_file = self.__init_dump_folder()
 
         # --- Model ---
-        pretrained: bool = self.config["weights"].endswith('.pt')
-        self.__setup_model(pretrained=pretrained,
+        locally_pretrained: bool = self.config["weights"].endswith('.pt')
+        self.__setup_model(locally_pretrained=locally_pretrained,
                            **other_model_params)
         self.__print_model()
         # --- Gradient accumulation ---
@@ -102,7 +100,7 @@ class Trainer:
         # self.exponential_moving_average = ExponentialMovingAverageModel(self.model)
 
         # --- Resume pretrained if necessary ---
-        if pretrained:
+        if locally_pretrained:
             start_epoch, best_fitness = self.__resume_pretrained(results_file=results_file)
             self.checkpoint = None
         else:
@@ -322,9 +320,9 @@ class Trainer:
             yaml.dump(self.config, f, sort_keys=False)
         return save_dir, weights_dir, last_ckpt, best_ckpt, results_file
 
-    def __setup_model(self, pretrained: bool, **other_model_params) -> None:
+    def __setup_model(self, locally_pretrained: bool, **other_model_params) -> None:
         # If pretrained, load checkpoint
-        if pretrained:
+        if locally_pretrained:
             self.checkpoint = torch.load(self.config["weights"], map_location=self.device)
             self.model = self.model_class(
                 config=self.config,
@@ -339,9 +337,12 @@ class Trainer:
                 f'items from {self.config["weights"]}')
         # Else initialize a new model
         else:
-            self.model = self.model_class(config=self.config,
-                                          config_path=self.config["architecture_config"],
-                                          logger=self.__logger, **other_model_params).to(self.device)
+            self.model = self.model_class.to(self.device)
+            # self.model_class().to(self.device)
+
+            # self.model = self.model_class(config=self.config,
+            #                               config_path=self.config["architecture_config"],
+            #                               logger=self.__logger, **other_model_params).to(self.device)
 
     def __setup_gradient_accumulation(self) -> int:
         # If the total batch size is less than or equal to the nominal batch size, then accumulate is set to 1.
@@ -452,31 +453,31 @@ def main():
     #                                    shuffle=True,
     #                                    num_workers=train_config["workers"])
 
-    # train = torch.utils.data.DataLoader(Food101Dataset(train=True),
-    #                                     batch_size=train_config["batch_size"],
-    #                                     shuffle=True,
-    #                                     num_workers=train_config["workers"],
-    #                                     drop_last=True)
-    # test = torch.utils.data.DataLoader(Food101Dataset(train=False),
-    #                                    batch_size=train_config["batch_size"],
-    #                                    shuffle=True,
-    #                                    num_workers=train_config["workers"],
-    #                                    drop_last=True)
-
-    train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=True),
-                                                         n_splits=1,
-                                                         train_size=10000,
-                                                         test_size=1000,)
-    train = torch.utils.data.DataLoader(train_subset,
+    train = torch.utils.data.DataLoader(Food101Dataset(train=True, augment=True),
                                         batch_size=train_config["batch_size"],
                                         shuffle=True,
                                         num_workers=train_config["workers"],
                                         drop_last=True)
-    test = torch.utils.data.DataLoader(test_subset,
+    test = torch.utils.data.DataLoader(Food101Dataset(train=False),
                                        batch_size=train_config["batch_size"],
                                        shuffle=True,
                                        num_workers=train_config["workers"],
                                        drop_last=True)
+
+    # train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=True),
+    #                                                      n_splits=1,
+    #                                                      train_size=10000,
+    #                                                      test_size=1000,)
+    # train = torch.utils.data.DataLoader(train_subset,
+    #                                     batch_size=train_config["batch_size"],
+    #                                     shuffle=True,
+    #                                     num_workers=train_config["workers"],
+    #                                     drop_last=True)
+    # test = torch.utils.data.DataLoader(test_subset,
+    #                                    batch_size=train_config["batch_size"],
+    #                                    shuffle=True,
+    #                                    num_workers=train_config["workers"],
+    #                                    drop_last=True)
 
     metric_collection = MetricCollection({
         'accuracy': torchmetrics.Accuracy(task="multiclass", num_classes=train_config["num_classes"]),
@@ -485,9 +486,13 @@ def main():
         'recall': torchmetrics.Recall(task="multiclass", num_classes=train_config["num_classes"], average="macro"),
         "F1": torchmetrics.F1Score(task="multiclass", num_classes=train_config["num_classes"], average="macro")
     })
-    trainer = Trainer(SmarterCNN, config=train_config, hyperparameters=hyp,
+    pretrained_model = convnext_small(weights='DEFAULT')  # model
+    num_ftrs = pretrained_model.classifier._modules['2'].in_features
+    pretrained_model.classifier._modules['2'] = nn.Linear(in_features=num_ftrs, out_features=train_config["num_classes"], bias=True)
+
+    trainer = Trainer(pretrained_model, config=train_config, hyperparameters=hyp,
                       metric_collection=metric_collection, logger=logger)
-    trainer.train(train, test, num_classes=train_config["num_classes"])
+    trainer.train(train, test, pretrained=True, num_classes=train_config["num_classes"])
 
 
 if __name__ == "__main__":
