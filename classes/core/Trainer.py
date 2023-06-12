@@ -204,7 +204,7 @@ class Trainer:
         # --- Console logging ---
         epoch_description: str = ""
         batch_number: int = len(train_dataloader)
-        progress_bar = tqdm(enumerate(train_dataloader), total=batch_number)
+        progress_bar = tqdm(enumerate(train_dataloader), total=batch_number, position=0, leave=True)
         # --- Zero gradient once and train batches ---
         self.optimizer.zero_grad()
 
