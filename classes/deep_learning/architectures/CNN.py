@@ -4,7 +4,7 @@ from torch import Tensor
 
 class CNN(nn.Module):
 
-    def __init__(self, **kwargs):
+    def __init__(self, config: dict, **kwargs):
         super(CNN, self).__init__()
         # # ----------------------------------------------------------
         # self.conv1 = nn.Conv2d(in_channels=1, out_channels=16,
@@ -22,26 +22,25 @@ class CNN(nn.Module):
         # # self.relu3 = nn.ReLU()
         # # self.fc2 = nn.Linear(in_features=128, out_features=10)
         # # ----------------------------------------------------------
-        num_pool: int = 0
         # ----------------------------------------------------------
-
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=16,
-                               kernel_size=7, stride=1, padding=3)
+        num_channels, img_size, num_classes = (config["num_channels"],
+                                               config["img_size"],
+                                               config["num_classes"])
+        self.conv1 = nn.Conv2d(in_channels=num_channels, out_channels=16,
+                               kernel_size=3, stride=1, padding=1)
         self.relu1 = nn.ReLU()
         self.pool1 = nn.MaxPool2d(kernel_size=2)
-        num_pool += 1
         # ----------------------------------------------------------
         self.conv2 = nn.Conv2d(in_channels=16, out_channels=32,
-                               kernel_size=7, stride=1, padding=3)
+                               kernel_size=3, stride=1, padding=1)
         self.relu2 = nn.ReLU()
         self.pool2 = nn.MaxPool2d(kernel_size=2)
-        num_pool += 1
         # ----------------------------------------------------------
         self.flatten = nn.Flatten()
         # Adjust the input size of the fully connected layer
         # Calculate the feature map size after the second pooling layer
-        feature_map_size = 224 // (2 ** num_pool)  # divided by 2 for each max-pooling layers
-        self.fc1 = nn.Linear(in_features=32 * feature_map_size * feature_map_size, out_features=101)
+        feature_map_size = img_size // (2 ** 2)  # divided by 2 for each max-pooling layers
+        self.fc1 = nn.Linear(in_features=32 * feature_map_size * feature_map_size, out_features=num_classes)
         # ----------------------------------------------------------
 
     def forward(self, x: Tensor) -> Tensor:
