@@ -15,7 +15,7 @@ from torch.cuda import amp
 from torch.utils.data import Dataset
 from torchmetrics import MetricCollection
 from torchvision.models import convnext_tiny, convnext_base, convnext_small
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from classes.data.Food101Dataset import Food101Dataset
 from classes.data.MNISTDataset import MNISTDataset
@@ -204,7 +204,7 @@ class Trainer:
         # --- Console logging ---
         epoch_description: str = ""
         batch_number: int = len(train_dataloader)
-        progress_bar = tqdm(enumerate(train_dataloader), total=batch_number, position=0, leave=True)
+        progress_bar = tqdm(enumerate(train_dataloader), total=batch_number)
         # --- Zero gradient once and train batches ---
         self.optimizer.zero_grad()
 
