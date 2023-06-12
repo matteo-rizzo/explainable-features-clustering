@@ -1,14 +1,16 @@
+# ---------- Data configuration ----------
+num_classes: 101
+img_size: 224
+num_channels: 3
+
 # --- Training operative configuration ---
 device: "cuda:0" # Cuda device, i.e. 0 or 0,1,2,3 or cpu
 workers: 0 # Maximum number of dataloader workers
-batch_size: 256 # Total batch size for all GPUs
-nominal_batch_size: 256
-#img_size: # [train, test] image sizes
-#  - 28   # train
-#  - 28   # test
-epochs: 10 # Number of training epochs
+batch_size: 80 # Total batch size for all GPUs
+nominal_batch_size: 80
+epochs: 100 # Number of training epochs
 
-optimizer: "SGD" # [SGD ,Adam ,AdamW ]
+optimizer: "AdamW" # [SGD ,Adam ,AdamW ]
 criterion: "CrossEntropyLoss" # [NLLLoss, CrossEntropyLoss]
 linear_lr: False # linear learning rate (decay)
 
@@ -18,12 +20,14 @@ notest: False # Only test final epoch
 logger: "INFO"
 
 # --- Configuration files and paths ---
-data: "config/datasets/food101.yaml" # data.yaml path [mnist, food101]
+# TODO: not very useful
+data: "config/datasets/mnist.yaml" # data.yaml path [mnist, food101]
 architecture_config: "default"
 weights: "" # Initial weights path
 hyperparameters: "config/training/hypeparameter_configuration.yaml"  # Hyperparameters path
 project: "dumps/train" # save to project/name
-name: "food101" # save to project/name
+# TODO: automatize
+name: "mnist" # save to project/name
 exist_ok: False # existing project/name ok, do not increment
 
 # TODO: ---

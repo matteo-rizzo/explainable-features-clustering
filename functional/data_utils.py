@@ -18,4 +18,5 @@ def check_img_size(img_size: int, stride: int = 32, logger: logging.Logger = log
 def create_stratified_splits(dataset, n_splits=1, train_size=700, test_size=300):
     splitter = StratifiedShuffleSplit(n_splits=n_splits, train_size=train_size, test_size=test_size)
     for i, (train_index, test_index) in enumerate(splitter.split(dataset.data, dataset.data._labels)):
+        # FIXME: do yield
         return Subset(dataset, train_index), Subset(dataset, test_index)

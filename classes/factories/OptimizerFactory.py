@@ -8,8 +8,8 @@ class OptimizerFactory:
     def __init__(self, network_parameters: nn.ParameterList, hyperparameters: dict):
         self.optimizers_map = {
             "SGD": optim.SGD(network_parameters, lr=hyperparameters["lr0"],
-                             # momentum=hyperparameters['momentum'],
-                             momentum=0.97,
+                             momentum=hyperparameters['momentum'],
+                             # momentum=0.97,
                              nesterov=True),
             "Adam": optim.Adam(network_parameters, lr=hyperparameters["lr0"],
                               betas=(hyperparameters['momentum'], 0.999)),
