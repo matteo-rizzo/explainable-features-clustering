@@ -31,7 +31,7 @@ def apply_with_p(transformation, parameters: Dict) -> T.RandomApply:
 
 def get_transform(params: Dict, img_size: Tuple):
     return T.Compose([
-        T.Resize(img_size),
+        T.Resize(img_size, antialias=True),
         T.ToTensor(),
         T.RandomHorizontalFlip(**params["flip"]),
         # Rotates an image with random angle

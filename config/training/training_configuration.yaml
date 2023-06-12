@@ -1,16 +1,16 @@
 # ---------- Data configuration ----------
-num_classes: 10
-img_size: 28
-num_channels: 1
+num_classes: 101
+img_size: 224
+num_channels: 3
 
 # --- Training operative configuration ---
 device: "cuda:0" # Cuda device, i.e. 0 or 0,1,2,3 or cpu
 workers: 0 # Maximum number of dataloader workers
-batch_size: 80 # Total batch size for all GPUs
-nominal_batch_size: 80
+batch_size: 256 # Total batch size for all GPUs
+nominal_batch_size: 256
 epochs: 100 # Number of training epochs
 
-optimizer: "Adam" # [SGD ,Adam ,AdamW ]
+optimizer: "AdamW" # [SGD ,Adam ,AdamW ]
 criterion: "CrossEntropyLoss" # [NLLLoss, CrossEntropyLoss]
 linear_lr: False # linear learning rate (decay)
 
