@@ -295,7 +295,7 @@ class Trainer:
         else:
             # Check files exist. The return is either the same path (if it was correct)
             # Or an updated path if it was found (uniquely) in the path's subdirectories
-            self.config["data"] = check_file_exists(self.config["data"])
+            # self.config["data"] = check_file_exists(self.config["data"])
             # Either check for configuration or pick default
             if not self.config["architecture_config"] == "default":
                 self.config["architecture_config"] = check_file_exists(self.config["architecture_config"])
@@ -481,7 +481,7 @@ def main():
         'recall': torchmetrics.Recall(task="multiclass", num_classes=train_config["num_classes"], average="macro"),
         "F1": torchmetrics.F1Score(task="multiclass", num_classes=train_config["num_classes"], average="macro")
     })
-    trainer = Trainer(convnext_small, config=train_config, hyperparameters=hyp,
+    trainer = Trainer(SmarterCNN, config=train_config, hyperparameters=hyp,
                       metric_collection=metric_collection, logger=logger)
     trainer.train(train, test, num_classes = train_config["num_classes"])
 
