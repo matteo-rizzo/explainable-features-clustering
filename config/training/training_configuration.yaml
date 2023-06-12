@@ -1,7 +1,7 @@
 # ---------- Data configuration ----------
-num_classes: 101
-img_size: 224
-num_channels: 3
+num_classes: 10
+img_size: 28
+num_channels: 1
 
 # --- Training operative configuration ---
 device: "cuda:0" # Cuda device, i.e. 0 or 0,1,2,3 or cpu
@@ -21,13 +21,13 @@ logger: "INFO"
 
 # --- Configuration files and paths ---
 # TODO: not very useful
-data: "config/datasets/food101.yaml" # data.yaml path [mnist, food101]
+data: "config/datasets/mnist.yaml" # data.yaml path [mnist, food101]
 architecture_config: "default"
 weights: "" # Initial weights path
 hyperparameters: "config/training/hypeparameter_configuration.yaml"  # Hyperparameters path
 project: "dumps/train" # save to project/name
 # TODO: automatize
-name: "food101" # save to project/name
+name: "mnist" # save to project/name
 exist_ok: False # existing project/name ok, do not increment
 
 # TODO: ---

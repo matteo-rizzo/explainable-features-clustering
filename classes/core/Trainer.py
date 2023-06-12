@@ -450,29 +450,29 @@ def main():
     #                                    shuffle=True,
     #                                    num_workers=train_config["workers"])
 
-    train = torch.utils.data.DataLoader(Food101Dataset(train=True),
-                                        batch_size=train_config["batch_size"],
-                                        shuffle=True,
-                                        num_workers=train_config["workers"],
-                                        drop_last=True)
-    test = torch.utils.data.DataLoader(Food101Dataset(train=False),
-                                       batch_size=train_config["batch_size"],
-                                       shuffle=True,
-                                       num_workers=train_config["workers"],
-                                       drop_last=True)
-
-    # train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True),
-    #                                                      n_splits=1, train_size=10000, test_size=1000)
-    # train = torch.utils.data.DataLoader(train_subset,
+    # train = torch.utils.data.DataLoader(Food101Dataset(train=True),
     #                                     batch_size=train_config["batch_size"],
     #                                     shuffle=True,
     #                                     num_workers=train_config["workers"],
     #                                     drop_last=True)
-    # test = torch.utils.data.DataLoader(test_subset,
+    # test = torch.utils.data.DataLoader(Food101Dataset(train=False),
     #                                    batch_size=train_config["batch_size"],
     #                                    shuffle=True,
     #                                    num_workers=train_config["workers"],
     #                                    drop_last=True)
+
+    train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True),
+                                                         n_splits=1, train_size=10000, test_size=1000)
+    train = torch.utils.data.DataLoader(train_subset,
+                                        batch_size=train_config["batch_size"],
+                                        shuffle=True,
+                                        num_workers=train_config["workers"],
+                                        drop_last=True)
+    test = torch.utils.data.DataLoader(test_subset,
+                                       batch_size=train_config["batch_size"],
+                                       shuffle=True,
+                                       num_workers=train_config["workers"],
+                                       drop_last=True)
 
     metric_collection = MetricCollection({
         'accuracy': torchmetrics.Accuracy(task="multiclass", num_classes=train_config["num_classes"]),
