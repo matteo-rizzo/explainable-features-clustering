@@ -32,23 +32,23 @@ def apply_with_p(transformation, parameters: Dict) -> T.RandomApply:
 def get_transform(params: Dict, img_size: Tuple):
     return T.Compose([
         T.Resize(img_size, antialias=True),
-        T.ToTensor(),
         T.RandomHorizontalFlip(**params["flip"]),
         # Rotates an image with random angle
         apply_with_p(T.RandomRotation, params["rotation"]),
         # Performs random affine transform on an image
-        apply_with_p(T.RandomAffine, params["random_affine"]),
+        # apply_with_p(T.RandomAffine, params["random_affine"]),
         # Randomly transforms the morphology of objects in images and produces a see-through-water-like effect
-        apply_with_p(T.ElasticTransform, params["elastic_transform"]),
+        # apply_with_p(T.ElasticTransform, params["elastic_transform"]),
         # Crops an image at a random location
         T.Compose([apply_with_p(T.RandomCrop, params["random_crop"]),
-                   T.Resize(img_size)]),
+                   T.Resize(img_size, antialias=True)]),
         # Randomly changes the brightness, saturation, and other properties of an image
         apply_with_p(T.ColorJitter, params["color_jitter"]),
         # Performs gaussian blur transform on an image
         apply_with_p(T.GaussianBlur, params["gaussian_blur"]),
         # Randomly selects a rectangle region in a torch Tensor image and erases its pixels (already has p)
-        T.RandomErasing(**params["random_erasing"]),
+        # T.RandomErasing(**params["random_erasing"]),
         # Performs random perspective transform on an image
         apply_with_p(T.RandomPerspective, params["random_perspective"]),
+        T.ToTensor()
     ])

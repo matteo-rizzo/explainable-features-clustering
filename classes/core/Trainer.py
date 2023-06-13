@@ -9,15 +9,12 @@ import colorlog
 import numpy as np
 import torch
 import torch.nn as nn
-import torchmetrics
 import yaml
 from torch.cuda import amp
 from torch.utils.data import Dataset
 from torchmetrics import MetricCollection
-from torchvision.models import convnext_small, resnet50
 from tqdm.auto import tqdm
 
-from classes.data.Food101Dataset import Food101Dataset
 from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from classes.factories.OptimizerFactory import OptimizerFactory
@@ -114,9 +111,9 @@ class Trainer:
             f'({self.config["nominal_batch_size"]} nominal)\t'
             f'{colorstr("bright_green", "Dataloader workers")}: {train_dataloader.num_workers}\t'
             f'{colorstr("bright_green", "Saving results to")}: {save_dir}\n'
-            f'{" " * 31}{colorstr("bright_green", "Optimizer")}: {self.config["optimizer"]}\t'
+            f'{" " * 31}{colorstr("bright_green", "Optimizer")}: {self.config["optimizer"]}\t '
             f'{colorstr("bright_green", "Learning rate")}: {self.hyperparameters["lr0"]}\t'
-            f'{colorstr("bright_green", "Placeholder")}: {"XXX"}\n'
+            f'{colorstr("bright_green", "Model")}: {self.model.__class__.__name__}\n'
             f'{" " * 31}{colorstr("bright_green", "Starting training for")} '
             f'{self.config["epochs"]} epochs...')
 
@@ -213,13 +210,9 @@ class Trainer:
         for idx, (inputs, targets) in progress_bar:
 
             inputs, n_integrated_batches = self.__warmup_batch(inputs, batch_number, epoch, idx, warmup_number)
+            # Autocast will cast to half precision
             with amp.autocast(enabled=self.device.type[:4] == "cuda"):
                 # --- Forward pass ---
-                # if hasattr(self.model, 'predict'):
-                #     # For "Model" classes
-                #     preds = self.model.predict(inputs)
-                # else:
-                #     # For "raw" models (only for debugging, usually)
                 preds = self.model(inputs)
 
                 loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
@@ -337,12 +330,9 @@ class Trainer:
                 f'items from {self.config["weights"]}')
         # Else initialize a new model
         else:
-            self.model = self.model_class.to(self.device)
-            # self.model_class().to(self.device)
-
-            # self.model = self.model_class(config=self.config,
-            #                               config_path=self.config["architecture_config"],
-            #                               logger=self.__logger, **other_model_params).to(self.device)
+            self.model = self.model_class(config=self.config,
+                                          config_path=self.config["architecture_config"],
+                                          logger=self.__logger, **other_model_params).to(self.device)
 
     def __setup_gradient_accumulation(self) -> int:
         # If the total batch size is less than or equal to the nominal batch size, then accumulate is set to 1.
@@ -434,66 +424,3 @@ class Trainer:
             arguments = str(module)[len(module_type.split(".")[-1]):]
             self.__logger.info(f'{idx:>3}{parameters:10.0f}  {module_type:<40}{arguments}')
         self.__logger.info(f'{"-" * 95}')
-
-
-def main():
-    logger = logging.getLogger(__name__)
-
-    with open('config/training/training_configuration.yaml', 'r') as f:
-        train_config = yaml.safe_load(f)
-    with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
-        hyp = yaml.safe_load(f)
-
-    # train = torch.utils.data.DataLoader(MNISTDataset(train=True),
-    #                                     batch_size=train_config["batch_size"],
-    #                                     shuffle=True,
-    #                                     num_workers=train_config["workers"])
-    # test = torch.utils.data.DataLoader(MNISTDataset(train=False),
-    #                                    batch_size=train_config["batch_size"],
-    #                                    shuffle=True,
-    #                                    num_workers=train_config["workers"])
-
-    train = torch.utils.data.DataLoader(Food101Dataset(train=True, augment=True),
-                                        batch_size=train_config["batch_size"],
-                                        shuffle=True,
-                                        num_workers=train_config["workers"],
-                                        drop_last=True)
-    test = torch.utils.data.DataLoader(Food101Dataset(train=False),
-                                       batch_size=train_config["batch_size"],
-                                       shuffle=True,
-                                       num_workers=train_config["workers"],
-                                       drop_last=True)
-
-    # train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=True),
-    #                                                      n_splits=1,
-    #                                                      train_size=10000,
-    #                                                      test_size=1000,)
-    # train = torch.utils.data.DataLoader(train_subset,
-    #                                     batch_size=train_config["batch_size"],
-    #                                     shuffle=True,
-    #                                     num_workers=train_config["workers"],
-    #                                     drop_last=True)
-    # test = torch.utils.data.DataLoader(test_subset,
-    #                                    batch_size=train_config["batch_size"],
-    #                                    shuffle=True,
-    #                                    num_workers=train_config["workers"],
-    #                                    drop_last=True)
-
-    metric_collection = MetricCollection({
-        'accuracy': torchmetrics.Accuracy(task="multiclass", num_classes=train_config["num_classes"]),
-        'precision': torchmetrics.Precision(task="multiclass", num_classes=train_config["num_classes"],
-                                            average="macro"),
-        'recall': torchmetrics.Recall(task="multiclass", num_classes=train_config["num_classes"], average="macro"),
-        "F1": torchmetrics.F1Score(task="multiclass", num_classes=train_config["num_classes"], average="macro")
-    })
-    pretrained_model = convnext_small(weights='DEFAULT')  # model
-    num_ftrs = pretrained_model.classifier._modules['2'].in_features
-    pretrained_model.classifier._modules['2'] = nn.Linear(in_features=num_ftrs, out_features=train_config["num_classes"], bias=True)
-
-    trainer = Trainer(pretrained_model, config=train_config, hyperparameters=hyp,
-                      metric_collection=metric_collection, logger=logger)
-    trainer.train(train, test, pretrained=True, num_classes=train_config["num_classes"])
-
-
-if __name__ == "__main__":
-    main()

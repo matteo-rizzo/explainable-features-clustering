@@ -34,7 +34,7 @@ class Food101Dataset(Dataset):
 
 
 def main():
-    dataloader = torch.utils.data.DataLoader(Food101Dataset(train=True, augment=True),
+    dataloader = torch.utils.data.DataLoader(Food101Dataset(train=True, augment=False),
                                              batch_size=1,
                                              shuffle=True,
                                              num_workers=0,
@@ -44,10 +44,9 @@ def main():
     for (x, y) in tqdm(dataloader):
         print(x.shape, y)
         plt.imshow(x.squeeze(0).permute(1, 2, 0))
+        plt.text(0, -12, str(dataloader.dataset.data.classes[y.item()]), color='green', fontsize=14, ha='left', va='top')
         plt.show()
-        # plt.clf()
-        _x = _x + 1
-        time.sleep(1)
+        time.sleep(1.5)
     print(f"{time.perf_counter() - t0:.2f} s")
 
 
