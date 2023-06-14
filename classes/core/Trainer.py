@@ -18,7 +18,6 @@ from tqdm.auto import tqdm
 from classes.factories.ActivationFactory import ActivationFactory
 from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
-from classes.factories.OptimizerFactory import OptimizerFactory
 from functional.lr_schedulers import linear_lrs, one_cycle_lrs
 from functional.torch_utils import strip_optimizer, get_device
 from functional.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run, colorstr
@@ -360,8 +359,17 @@ class Trainer:
 
     def __setup_optimizer(self) -> torch.optim.Optimizer:
         # TODO: look up different optimization for different parameter groups
-        return OptimizerFactory(nn.ParameterList(self.model.parameters()),
-                                hyperparameters=self.hyperparameters).get(self.config["optimizer"])
+        match self.config["optimizer"]:
+            case "SGD":
+                return torch.optim.SGD(self.model.parameters(), lr=self.hyperparameters["lr0"],
+                                       momentum=self.hyperparameters['momentum'],
+                                       nesterov=True)
+            case "Adam":
+                return torch.optim.Adam(self.model.parameters(), lr=self.hyperparameters["lr0"],
+                                        betas=(self.hyperparameters['momentum'], 0.999))
+            case "AdamW":
+                return torch.optim.AdamW(self.model.parameters(), lr=self.hyperparameters["lr0"],
+                                         betas=(self.hyperparameters['momentum'], 0.999))
 
     def __setup_criterion(self) -> torch.nn.modules.loss:
         return CriterionFactory().get(self.config["criterion"])
