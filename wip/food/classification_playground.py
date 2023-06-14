@@ -124,7 +124,7 @@ def simple_for():
             optimizer.zero_grad()
 
             x, y = x.to(device), y.to(device)
-            x = norm(x)
+            # x = norm(x)
             o = model(x).to(device)
             # print(o.shape)
             loss = criterion(o, y)
@@ -157,5 +157,5 @@ def simple_for():
 
 
 if __name__ == "__main__":
-    # main()
-    simple_for()
+    main()
+    # simple_for()
