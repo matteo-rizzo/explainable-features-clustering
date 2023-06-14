@@ -167,7 +167,7 @@ class Trainer:
         self.model.eval()
         # --- Console logging ---
         batch_number: int = len(dataloader)
-        progress_bar = tqdm(enumerate(dataloader), total=batch_number)
+        progress_bar = tqdm(enumerate(dataloader), total=batch_number, leave=True)
         rolling_metrics = [torch.tensor(0.0, device=self.device), ] * len(self.metrics)
         # --------------------------------------------------
         for idx, (inputs, targets) in progress_bar:
@@ -176,8 +176,8 @@ class Trainer:
             with torch.no_grad():
                 pred_logits = self.model(inputs)
                 # Softmax/Sigmoid/Whatever selected
-                preds = self.activation(preds)
-                result_dict = self.metrics(pred_logits, targets)
+                preds = self.activation(pred_logits)
+                result_dict = self.metrics(preds, targets)
                 rolling_metrics = [x + y for x, y in zip(rolling_metrics, result_dict.values())]
                 batch_desc = f"{colorstr('bold', 'white', '[TEST]' if not on_train else '[TRAIN]')}\t"
                 for metric_name, metric_value in zip(result_dict.keys(), rolling_metrics):
