@@ -113,7 +113,7 @@ def simple_for():
     device = get_device(DEVICE_TYPE)
 
     model = ConvNextWrapper(train_config).to(device)
-    optimizer = OptimizerFactory(list(model.model.parameters()), hyp).get(OPTIMIZER)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
     criterion = CriterionFactory().get(CRITERION).to(device)
     model.train()
     norm = Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
