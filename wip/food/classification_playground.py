@@ -45,7 +45,7 @@ def main():
 
     train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=False),
                                                          n_splits=1,
-                                                         train_size=4040,
+                                                         train_size=10100,
                                                          test_size=1010, )
     train = torch.utils.data.DataLoader(train_subset,
                                         batch_size=train_config["batch_size"],
