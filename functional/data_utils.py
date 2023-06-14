@@ -29,9 +29,10 @@ def apply_with_p(transformation, parameters: Dict) -> T.RandomApply:
     return T.RandomApply([transformation(**dict(params))], p=p)
 
 
-def get_transform(params: Dict, img_size: Tuple):
+def get_transform(params: Dict, img_size: int):
     return T.Compose([
         T.Resize(img_size, antialias=True),
+        T.CenterCrop((img_size, img_size)),
         T.RandomHorizontalFlip(**params["flip"]),
         # Rotates an image with random angle
         apply_with_p(T.RandomRotation, params["rotation"]),
@@ -41,7 +42,7 @@ def get_transform(params: Dict, img_size: Tuple):
         # apply_with_p(T.ElasticTransform, params["elastic_transform"]),
         # Crops an image at a random location
         T.Compose([apply_with_p(T.RandomCrop, params["random_crop"]),
-                   T.Resize(img_size, antialias=True)]),
+                   T.Resize((img_size, img_size), antialias=True)]),
         # Randomly changes the brightness, saturation, and other properties of an image
         apply_with_p(T.ColorJitter, params["color_jitter"]),
         # Performs gaussian blur transform on an image

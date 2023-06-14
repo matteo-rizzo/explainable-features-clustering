@@ -1,11 +1,11 @@
 import time
-import yaml
 
 import torch
+import yaml
 from matplotlib import pyplot as plt
 from torch.utils.data import Dataset
 from torchvision.datasets import Food101
-from torchvision.transforms import ToTensor, Resize, Compose
+from torchvision.transforms import ToTensor, Resize, Compose, CenterCrop, Normalize
 from tqdm import tqdm
 
 from functional.data_utils import get_transform
@@ -17,11 +17,12 @@ class Food101Dataset(Dataset):
         if augment:
             with open('config/datasets/augmentations_preset_1.yaml', 'r') as f:
                 transforms_config = yaml.safe_load(f)
-            self.transform = get_transform(transforms_config,(224, 224))
+            self.transform = get_transform(transforms_config, img_size=224)
         else:
             self.transform = Compose([
-                Resize((224, 224)),
-                ToTensor()
+                Resize(224),
+                CenterCrop((224, 224)),
+                ToTensor(),
             ])
 
     def __getitem__(self, index):
@@ -44,7 +45,8 @@ def main():
     for (x, y) in tqdm(dataloader):
         print(x.shape, y)
         plt.imshow(x.squeeze(0).permute(1, 2, 0))
-        plt.text(0, -12, str(dataloader.dataset.data.classes[y.item()]), color='green', fontsize=14, ha='left', va='top')
+        plt.text(0, -12, str(dataloader.dataset.data.classes[y.item()]), color='green', fontsize=14, ha='left',
+                 va='top')
         plt.show()
         time.sleep(1.5)
     print(f"{time.perf_counter() - t0:.2f} s")

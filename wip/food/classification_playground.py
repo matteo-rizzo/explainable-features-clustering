@@ -82,7 +82,7 @@ OPTIMIZER = "AdamW"
 LEARNING_RATE = 0.0001
 CRITERION = "CrossEntropyLoss"
 EPOCHS = 15
-
+from torchvision.transforms import ToTensor, Resize, Compose, CenterCrop, Normalize
 
 def get_accuracy(logits, gt, total: int, correct: int):
     _, predicted = torch.max(logits.data, 1)
@@ -116,13 +116,15 @@ def simple_for():
     optimizer = OptimizerFactory(list(model.parameters()), hyp).get(OPTIMIZER)
     criterion = CriterionFactory().get(CRITERION).to(device)
     model.train()
-
+    norm = Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     for epoch in range(EPOCHS):
 
         running_loss, correct, total = 0.0, 0, 0
         for i, (x, y) in tqdm(enumerate(train), desc="Training epoch: {}".format(epoch), total=len(train)):
             optimizer.zero_grad()
+
             x, y = x.to(device), y.to(device)
+            x = norm(x)
             o = model(x).to(device)
             # print(o.shape)
             loss = criterion(o, y)
