@@ -97,8 +97,8 @@ def simple_for():
         hyp = yaml.safe_load(f)
     train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=False),
                                                          n_splits=1,
-                                                         train_size=707,
-                                                         test_size=303,)
+                                                         train_size=10100,
+                                                         test_size=1010,)
     train = torch.utils.data.DataLoader(train_subset,
                                         batch_size=train_config["batch_size"],
                                         shuffle=True,
@@ -129,7 +129,7 @@ def simple_for():
             loss.backward()
             optimizer.step()
             loss = loss.item()
-            print(loss)
+            # print(loss)
             running_loss += loss
             total, correct = get_accuracy(o, y, total, correct)
 
