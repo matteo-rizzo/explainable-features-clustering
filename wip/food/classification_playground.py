@@ -45,7 +45,7 @@ def main():
 
     train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=False),
                                                          n_splits=1,
-                                                         train_size=10100,
+                                                         train_size=4040,
                                                          test_size=1010, )
     train = torch.utils.data.DataLoader(train_subset,
                                         batch_size=train_config["batch_size"],
@@ -113,7 +113,7 @@ def simple_for():
     device = get_device(DEVICE_TYPE)
 
     model = ConvNextWrapper(train_config).to(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    optimizer = OptimizerFactory(list(model.model.parameters()), hyp).get(OPTIMIZER)
     criterion = CriterionFactory().get(CRITERION).to(device)
     model.train()
     norm = Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -157,5 +157,5 @@ def simple_for():
 
 
 if __name__ == "__main__":
-    main()
-    # simple_for()
+    # main()
+    simple_for()

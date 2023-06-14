@@ -6,7 +6,7 @@ from torch import optim
 class OptimizerFactory:
 
     def __init__(self, network_parameters, hyperparameters: dict):
-        raise NotImplementedError("This does NOT work")
+        # raise NotImplementedError("This does NOT work")
         self.optimizers_map = {
             "SGD": optim.SGD(network_parameters, lr=hyperparameters["lr0"],
                              momentum=hyperparameters['momentum'],
