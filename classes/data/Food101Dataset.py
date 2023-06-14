@@ -5,7 +5,7 @@ import yaml
 from matplotlib import pyplot as plt
 from torch.utils.data import Dataset
 from torchvision.datasets import Food101
-from torchvision.transforms import ToTensor, Resize, Compose, CenterCrop, Normalize
+import torchvision.transforms as T
 from tqdm import tqdm
 
 from functional.data_utils import get_transform
@@ -13,21 +13,25 @@ from functional.data_utils import get_transform
 
 class Food101Dataset(Dataset):
     def __init__(self, root: str = "dataset", train: bool = True, augment: bool = False):
-        self.data = Food101(root=root, split="train" if train else "test", download=True)
         if augment:
             with open('config/datasets/augmentations_preset_1.yaml', 'r') as f:
                 transforms_config = yaml.safe_load(f)
-            self.transform = get_transform(transforms_config, img_size=224)
+            transform = get_transform(transforms_config, img_size=224)
         else:
-            self.transform = Compose([
-                Resize(224),
-                CenterCrop((224, 224)),
-                ToTensor(),
+            transform = T.Compose([
+                T.Resize(224),
+                T.CenterCrop((224, 224)),
+                T.ToTensor(),
+                T.Normalize((0.5,),(0.5,)),
             ])
+
+        self.data = Food101(root=root,
+        transform=transform,
+                            split="train" if train else "test",
+                            download=True)
 
     def __getitem__(self, index):
         img, label = self.data[index]
-        img = self.transform(img)
         return img, label
 
     def __len__(self):
@@ -35,7 +39,7 @@ class Food101Dataset(Dataset):
 
 
 def main():
-    dataloader = torch.utils.data.DataLoader(Food101Dataset(train=True, augment=False),
+    dataloader = torch.utils.data.DataLoader(Food101Dataset(train=True, augment=True),
                                              batch_size=1,
                                              shuffle=True,
                                              num_workers=0,
