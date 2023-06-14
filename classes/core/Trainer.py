@@ -363,7 +363,7 @@ class Trainer:
             case "SGD":
                 return torch.optim.SGD(self.model.parameters(), lr=self.hyperparameters["lr0"],
                                        momentum=self.hyperparameters['momentum'],
-                                       nesterov=True)
+                                       nesterov=self.hyperparameters['nesterov'])
             case "Adam":
                 return torch.optim.Adam(self.model.parameters(), lr=self.hyperparameters["lr0"],
                                         betas=(self.hyperparameters['momentum'], 0.999))
