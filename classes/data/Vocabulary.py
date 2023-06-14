@@ -76,3 +76,7 @@ class Vocabulary:
             batched_embeddings.append(torch.flatten(torch.tensor(img_embedding)))
         # Stack the batched embeddings along the batch dimension and add singleton dimensions
         return torch.stack(batched_embeddings).unsqueeze(1).unsqueeze(1)
+
+
+# mappe di presenza delle SIFT
+# dataset cartelli stradali

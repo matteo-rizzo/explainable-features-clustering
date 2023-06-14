@@ -15,6 +15,7 @@ from torch.utils.data import Dataset
 from torchmetrics import MetricCollection
 from tqdm.auto import tqdm
 
+from classes.factories.ActivationFactory import ActivationFactory
 from classes.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from classes.factories.OptimizerFactory import OptimizerFactory
@@ -58,6 +59,7 @@ class Trainer:
         self.accumulate: int = -1
         # ---
         self.model_class: Type[nn.Module] = model_class
+        self.activation: nn.Module = self.__setup_activation()
         self.model: Optional[nn.Module] = None
         self.checkpoint = None
 
@@ -113,7 +115,8 @@ class Trainer:
             f'{colorstr("bright_green", "Saving results to")}: {save_dir}\n'
             f'{" " * 31}{colorstr("bright_green", "Optimizer")}: {self.config["optimizer"]}\t '
             f'{colorstr("bright_green", "Learning rate")}: {self.hyperparameters["lr0"]}\t'
-            f'{colorstr("bright_green", "Model")}: {self.model.__class__.__name__}\n'
+            f'{colorstr("bright_green", "Model")}: {self.model.__class__.__name__}\t'
+            f'{colorstr("bright_green", "Inference activation function")}: {self.config["inference"]}\n'
             f'{" " * 31}{colorstr("bright_green", "Starting training for")} '
             f'{self.config["epochs"]} epochs...')
 
@@ -171,8 +174,10 @@ class Trainer:
             inputs = inputs.to(self.device, non_blocking=True)
             targets = targets.to(self.device)
             with torch.no_grad():
-                preds = self.model(inputs)
-                result_dict = self.metrics(preds, targets)
+                pred_logits = self.model(inputs)
+                # Softmax/Sigmoid/Whatever selected
+                preds = self.activation(preds)
+                result_dict = self.metrics(pred_logits, targets)
                 rolling_metrics = [x + y for x, y in zip(rolling_metrics, result_dict.values())]
                 batch_desc = f"{colorstr('bold', 'white', '[TEST]' if not on_train else '[TRAIN]')}\t"
                 for metric_name, metric_value in zip(result_dict.keys(), rolling_metrics):
@@ -360,6 +365,9 @@ class Trainer:
 
     def __setup_criterion(self) -> torch.nn.modules.loss:
         return CriterionFactory().get(self.config["criterion"])
+
+    def __setup_activation(self) -> torch.nn.modules.loss:
+        return ActivationFactory().get(self.config["inference"])
 
     def __resume_pretrained(self, results_file) -> [int, float]:
         # --- Optimizer ---
