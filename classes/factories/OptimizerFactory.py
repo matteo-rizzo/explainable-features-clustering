@@ -5,7 +5,8 @@ from torch import optim
 
 class OptimizerFactory:
 
-    def __init__(self, network_parameters: nn.ParameterList, hyperparameters: dict):
+    def __init__(self, network_parameters, hyperparameters: dict):
+        # raise NotImplementedError("This does NOT work")
         self.optimizers_map = {
             "SGD": optim.SGD(network_parameters, lr=hyperparameters["lr0"],
                              momentum=hyperparameters['momentum'],
@@ -16,6 +17,7 @@ class OptimizerFactory:
             "AdamW": optim.AdamW(network_parameters, lr=hyperparameters["lr0"],
                                 betas=(hyperparameters['momentum'], 0.999)),
         }
+
 
     def get(self, optimizer_type: str) -> torch.optim:
         if optimizer_type not in self.optimizers_map.keys():
