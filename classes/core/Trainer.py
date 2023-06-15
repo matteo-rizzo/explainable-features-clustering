@@ -84,10 +84,11 @@ class Trainer:
         self.__setup_model(locally_pretrained=locally_pretrained)
         self.__print_model()
         # --- Gradient accumulation ---
-        self.accumulate: int = self.__setup_gradient_accumulation()
+        # self.accumulate: int = self.__setup_gradient_accumulation()
 
         # --- Optimization ---
-        self.optimizer: torch.optim.Optimizer = self.__setup_optimizer()
+        # self.optimizer: torch.optim.Optimizer = self.__setup_optimizer()
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9)
         self.loss_fn: torch.nn.modules.loss = self.__setup_criterion()
         # TODO: make optional / modularize
         # self.scheduler: torch.optim.lr_scheduler = self.__setup_scheduler()
