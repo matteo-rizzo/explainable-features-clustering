@@ -156,5 +156,5 @@ def simple_for():
 
 
 if __name__ == "__main__":
-    # main()
-    simple_for()
+    main()
+    # simple_for()
