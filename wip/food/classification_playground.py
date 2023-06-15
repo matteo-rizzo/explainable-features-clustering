@@ -106,12 +106,12 @@ def simple_for():
                                         batch_size=train_config["batch_size"],
                                         shuffle=True,
                                         num_workers=train_config["workers"],
-                                        drop_last=False)
+                                        drop_last=True)
     test = torch.utils.data.DataLoader(test_subset,
                                        batch_size=train_config["batch_size"],
                                        shuffle=False,
                                        num_workers=train_config["workers"],
-                                       drop_last=False)
+                                       drop_last=True)
 
     device = get_device(DEVICE_TYPE)
 
