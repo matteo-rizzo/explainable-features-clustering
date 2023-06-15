@@ -218,12 +218,11 @@ class Trainer:
                 # --- Forward pass ---
                 preds = self.model(inputs.to(self.config["device"]))
                 loss = self.loss_fn(preds, targets.to(self.config["device"]))
-            # loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
 
             # --- Backward (not recommended to be under autocast) ---
             loss.backward()
-            self.optimizer.step()
-            # self.gradient_scaler.scale(loss).backward()
+            # self.optimizer.step()
+            self.gradient_scaler.scale(loss).backward()
             # # --- Optimization ---
             if n_integrated_batches % self.accumulate == 0:
                 # Optimizer step and update
