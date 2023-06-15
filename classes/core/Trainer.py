@@ -220,7 +220,7 @@ class Trainer:
                 loss = self.loss_fn(preds, targets.to(self.config["device"]))
 
             # --- Backward (not recommended to be under autocast) ---
-            loss.backward()
+            # loss.backward()
             # self.optimizer.step()
             self.gradient_scaler.scale(loss).backward()
             # # --- Optimization ---
