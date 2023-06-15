@@ -195,8 +195,6 @@ class Trainer:
             self.__logger.info(epoch_desc)
             # self.__logger.info(f"{'-' * 100}")
             results = [m.cpu().item() / batch_number for m in rolling_metrics]
-            # Test
-            self.model.train()
             return results
 
     def __train_one_epoch(self, train_dataloader: torch.utils.data.DataLoader, epoch: int):
