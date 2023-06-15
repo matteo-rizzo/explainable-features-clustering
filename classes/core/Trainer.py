@@ -212,39 +212,36 @@ class Trainer:
         # Number of warmup iterations, max(config epochs (e.g., 3), 1k iterations)
         warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)
         for idx, (inputs, targets) in progress_bar:
-
+            # --- Zero gradient ---
+            self.optimizer.zero_grad()
+            # --- Warmup if enabled ---
             inputs, n_integrated_batches = self.__warmup_batch(inputs, batch_number, epoch, idx, warmup_number)
-            # Autocast will cast to half precision
+            # Autocast will cast to half precision the forward pass
             with amp.autocast(enabled=self.device.type[:4] == "cuda"):
                 # --- Forward pass ---
                 preds = self.model(inputs)
-
                 loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
 
-                # --- Backward ---
-                self.gradient_scaler.scale(loss).backward()
+            # --- Backward (not recommended to be under autocast) ---
+            self.gradient_scaler.scale(loss).backward()
+            # --- Optimization ---
+            if n_integrated_batches % self.accumulate == 0:
+                # Optimizer step and update
+                self.gradient_scaler.step(self.optimizer)
+                self.gradient_scaler.update()
+                # if self.exponential_moving_average:
+                #     self.exponential_moving_average.update(self.model)
 
-                # --- Optimization ---
-                if n_integrated_batches % self.accumulate == 0:
-                    # Optimizer.step
-                    self.gradient_scaler.step(self.optimizer)
-                    self.gradient_scaler.update()
-                    # Gradient reset
-                    self.optimizer.zero_grad()
-                    # if self.exponential_moving_average:
-                    #     self.exponential_moving_average.update(self.model)
-
-                # --- Console logging ---
-                mem: str = f'{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2g}G'
-                max_mem: float = torch.cuda.get_device_properties(self.device.index).total_memory
-                total_mem: str = f"{(max_mem / 1E9) if torch.cuda.is_available() else 0:.2g}G"
-                s = (f"{colorstr('bold', 'white', '[TRAIN]')}"
-                     f"\t{colorstr('bold', 'magenta', 'Epoch')}: {epoch}/{self.config['epochs'] - 1}"
-                     f"\t{colorstr('bold', 'magenta', 'Gpu_mem')}: {mem}/{total_mem}"
-                     f"\t{colorstr('bold', 'magenta', f'{str(self.criterion)[:-2]}')}: {loss:.4f}"
-                     # f"\t{colorstr('bold', 'magenta', 'img_size')}: {imgs.shape[-2]}x{imgs.shape[-1]}"
-                     )
-                progress_bar.set_description(s)
+            # --- Console logging ---
+            mem: str = f'{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2g}G'
+            max_mem: float = torch.cuda.get_device_properties(self.device.index).total_memory
+            total_mem: str = f"{(max_mem / 1E9) if torch.cuda.is_available() else 0:.2g}G"
+            s = (f"{colorstr('bold', 'white', '[TRAIN]')}"
+                 f"\t{colorstr('bold', 'magenta', 'Epoch')}: {epoch}/{self.config['epochs'] - 1}"
+                 f"\t{colorstr('bold', 'magenta', 'Gpu_mem')}: {mem}/{total_mem}"
+                 f"\t{colorstr('bold', 'magenta', f'{str(self.criterion)[:-2]}')}: {loss:.4f}"
+                 )
+            progress_bar.set_description(s)
 
         return epoch_description
 
@@ -361,14 +358,17 @@ class Trainer:
         # TODO: look up different optimization for different parameter groups
         match self.config["optimizer"]:
             case "SGD":
-                return torch.optim.SGD(self.model.parameters(), lr=self.hyperparameters["lr0"],
+                return torch.optim.SGD(self.model.parameters(),
+                                       lr=self.hyperparameters["lr0"],
                                        momentum=self.hyperparameters['momentum'],
                                        nesterov=self.hyperparameters['nesterov'])
             case "Adam":
-                return torch.optim.Adam(self.model.parameters(), lr=self.hyperparameters["lr0"],
+                return torch.optim.Adam(self.model.parameters(),
+                                        lr=self.hyperparameters["lr0"],
                                         betas=(self.hyperparameters['momentum'], 0.999))
             case "AdamW":
-                return torch.optim.AdamW(self.model.parameters(), lr=self.hyperparameters["lr0"],
+                return torch.optim.AdamW(self.model.parameters(),
+                                         lr=self.hyperparameters["lr0"],
                                          betas=(self.hyperparameters['momentum'], 0.999))
 
     def __setup_criterion(self) -> torch.nn.modules.loss:

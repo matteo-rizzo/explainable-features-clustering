@@ -3,7 +3,7 @@ from torch import nn
 
 class ActivationFactory:
     activation_map = {
-        "Softmax": nn.Softmax(),
+        "Softmax": nn.Softmax(dim=1),
         "Sigmoid": nn.Sigmoid()
     }
 

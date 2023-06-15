@@ -45,7 +45,7 @@ def main():
 
     train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=False),
                                                          n_splits=1,
-                                                         train_size=10100,
+                                                         train_size=4040,
                                                          test_size=1010, )
     train = torch.utils.data.DataLoader(train_subset,
                                         batch_size=train_config["batch_size"],
@@ -61,13 +61,15 @@ def main():
     metric_collection = MetricCollection({
         'accuracy': torchmetrics.Accuracy(task="multiclass",
                                           num_classes=train_config["num_classes"]),
-        'micro_precision': torchmetrics.Precision(task="multiclass",
-                                                  num_classes=train_config["num_classes"],
-                                                  average="micro"),
-        'micro_recall': torchmetrics.Recall(task="multiclass",
-                                            num_classes=train_config["num_classes"], average="micro"),
-        "micro_F1": torchmetrics.F1Score(task="multiclass",
-                                         num_classes=train_config["num_classes"], average="micro")
+        # 'micro_precision': torchmetrics.Precision(task="multiclass",
+        #                                           num_classes=train_config["num_classes"],
+        #                                           average="micro"),
+        # 'micro_recall': torchmetrics.Recall(task="multiclass",
+        #                                     num_classes=train_config["num_classes"],
+        #                                     average="micro"),
+        # "micro_F1": torchmetrics.F1Score(task="multiclass",
+        #                                  num_classes=train_config["num_classes"],
+        #                                  average="micro")
     })
 
     trainer = Trainer(ConvNextWrapper, config=train_config, hyperparameters=hyp,
@@ -95,30 +97,21 @@ def simple_for():
         train_config = yaml.safe_load(f)
     with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
         hyp = yaml.safe_load(f)
-    # train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=False),
-    #                                                      n_splits=1,
-    #                                                      train_size=10100,
-    #                                                      test_size=1010,)
-    # train = torch.utils.data.DataLoader(train_subset,
-    #                                     batch_size=train_config["batch_size"],
-    #                                     shuffle=True,
-    #                                     num_workers=train_config["workers"],
-    #                                     drop_last=True)
-    # test = torch.utils.data.DataLoader(test_subset,
-    #                                    batch_size=train_config["batch_size"],
-    #                                    shuffle=False,
-    #                                    num_workers=train_config["workers"],
-    #                                    drop_last=True)
-    train = torch.utils.data.DataLoader(Food101Dataset(train=True, augment=True),
+
+    train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=False),
+                                                         n_splits=1,
+                                                         train_size=4040,
+                                                         test_size=1010, )
+    train = torch.utils.data.DataLoader(train_subset,
                                         batch_size=train_config["batch_size"],
                                         shuffle=True,
                                         num_workers=train_config["workers"],
-                                        drop_last=True)
-    test = torch.utils.data.DataLoader(Food101Dataset(train=False),
+                                        drop_last=False)
+    test = torch.utils.data.DataLoader(test_subset,
                                        batch_size=train_config["batch_size"],
-                                       shuffle=True,
+                                       shuffle=False,
                                        num_workers=train_config["workers"],
-                                       drop_last=True)
+                                       drop_last=False)
 
     device = get_device(DEVICE_TYPE)
 
