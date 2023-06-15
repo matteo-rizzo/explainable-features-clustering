@@ -87,8 +87,8 @@ class Trainer:
         # self.accumulate: int = self.__setup_gradient_accumulation()
 
         # --- Optimization ---
-        # self.optimizer: torch.optim.Optimizer = self.__setup_optimizer()
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9)
+        self.__setup_optimizer()
+        # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9)
         self.loss_fn: torch.nn.modules.loss = self.__setup_criterion()
         # TODO: make optional / modularize
         # self.scheduler: torch.optim.lr_scheduler = self.__setup_scheduler()
@@ -357,20 +357,20 @@ class Trainer:
                                                 steps=self.config["epochs"])  # cosine 1->hyp['lrf']
         return torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=self.lr_schedule_fn)
 
-    def __setup_optimizer(self) -> torch.optim.Optimizer:
+    def __setup_optimizer(self):
         # TODO: look up different optimization for different parameter groups
         match self.config["optimizer"]:
             case "SGD":
-                return torch.optim.SGD(self.model.parameters(),
+                self.optimizer = torch.optim.SGD(self.model.parameters(),
                                        lr=self.hyperparameters["lr0"],
                                        momentum=self.hyperparameters['momentum'],
                                        nesterov=self.hyperparameters['nesterov'])
             case "Adam":
-                return torch.optim.Adam(self.model.parameters(),
+                self.optimizer = torch.optim.Adam(self.model.parameters(),
                                         lr=self.hyperparameters["lr0"],
                                         betas=(self.hyperparameters['momentum'], 0.999))
             case "AdamW":
-                return torch.optim.AdamW(self.model.parameters(),
+                self.optimizer = torch.optim.AdamW(self.model.parameters(),
                                          lr=self.hyperparameters["lr0"],
                                          betas=(self.hyperparameters['momentum'], 0.999))
 
