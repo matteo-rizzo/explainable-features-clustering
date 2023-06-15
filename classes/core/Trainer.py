@@ -53,7 +53,7 @@ class Trainer:
         # self.exponential_moving_average = None
         self.lr_schedule_fn: Optional[Callable] = None  # Scheduling function
         self.scheduler: torch.optim.lr_scheduler = None  # Torch scheduler
-        self.criterion: torch.nn.modules.loss = None  # Loss
+        self.loss_fn: torch.nn.modules.loss = None  # Loss
         self.metrics: MetricCollection = metric_collection.to(self.device)  # Metrics
         self.accumulate: int = -1
         # ---
@@ -88,7 +88,7 @@ class Trainer:
 
         # --- Optimization ---
         self.optimizer: torch.optim.Optimizer = self.__setup_optimizer()
-        self.criterion: torch.nn.modules.loss = self.__setup_criterion()
+        self.loss_fn: torch.nn.modules.loss = self.__setup_criterion()
         # TODO: make optional / modularize
         # self.scheduler: torch.optim.lr_scheduler = self.__setup_scheduler()
 
@@ -218,7 +218,8 @@ class Trainer:
             # with amp.autocast(enabled=self.device.type[:4] == "cuda"):
                 # --- Forward pass ---
             preds = self.model(inputs.to(self.config["device"]))
-            loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
+            loss = self.loss_fn(preds, targets.to(self.config["device"]))
+            # loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
 
             # --- Backward (not recommended to be under autocast) ---
             loss.backward()
@@ -239,15 +240,16 @@ class Trainer:
             s = (f"{colorstr('bold', 'white', '[TRAIN]')}"
                  f"\t{colorstr('bold', 'magenta', 'Epoch')}: {epoch}/{self.config['epochs'] - 1}"
                  f"\t{colorstr('bold', 'magenta', 'Gpu_mem')}: {mem}/{total_mem}"
-                 f"\t{colorstr('bold', 'magenta', f'{str(self.criterion)[:-2]}')}: {loss:.4f}"
+                 f"\t{colorstr('bold', 'magenta', f'{str(self.loss_fn)[:-2]}')}: {loss:.4f}"
                  )
             progress_bar.set_description(s)
 
         return epoch_description
 
     def __calculate_loss(self, preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        raise NotImplementedError
         # TODO: possibly add other parameters
-        loss = self.criterion(preds, targets.to(self.config["device"]))
+        loss = self.loss_fn(preds, targets.to(self.config["device"]))
         return loss
 
     def __warmup_batch(self, inputs: torch.Tensor, batch_number: int,
