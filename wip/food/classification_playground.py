@@ -74,7 +74,7 @@ def main():
 
     trainer = Trainer(ConvNextWrapper, config=train_config, hyperparameters=hyp,
                       metric_collection=metric_collection, logger=logger)
-    trainer.train(train, test, pretrained=True, num_classes=train_config["num_classes"])
+    trainer.train(train, test)
 
 
 PLOT = False
@@ -156,5 +156,5 @@ def simple_for():
 
 
 if __name__ == "__main__":
-    # main()
-    simple_for()
+    main()
+    # simple_for()

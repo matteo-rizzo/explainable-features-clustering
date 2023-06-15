@@ -74,16 +74,14 @@ class Trainer:
         self.__logger.addHandler(ch)
 
     def train(self, train_dataloader: torch.utils.data.DataLoader,
-              test_dataloader: torch.utils.data.DataLoader = None,
-              **other_model_params):
+              test_dataloader: torch.utils.data.DataLoader = None):
         # --- Directories, initialize where things are saved ---
         self.__start_or_resume_config()
         save_dir, weights_dir, last_ckpt, best_ckpt, results_file = self.__init_dump_folder()
 
         # --- Model ---
         locally_pretrained: bool = self.config["weights"].endswith('.pt')
-        self.__setup_model(locally_pretrained=locally_pretrained,
-                           **other_model_params)
+        self.__setup_model(locally_pretrained=locally_pretrained)
         self.__print_model()
         # --- Gradient accumulation ---
         self.accumulate: int = self.__setup_gradient_accumulation()
@@ -92,7 +90,7 @@ class Trainer:
         self.optimizer: torch.optim.Optimizer = self.__setup_optimizer()
         self.criterion: torch.nn.modules.loss = self.__setup_criterion()
         # TODO: make optional / modularize
-        self.scheduler: torch.optim.lr_scheduler = self.__setup_scheduler()
+        # self.scheduler: torch.optim.lr_scheduler = self.__setup_scheduler()
 
         # --- Exponential moving average ---
         # self.exponential_moving_average = ExponentialMovingAverageModel(self.model)
@@ -105,8 +103,8 @@ class Trainer:
             start_epoch, best_fitness = 0, 0.0
 
         results = (0,) * len(self.metrics)
-        self.scheduler.last_epoch = start_epoch - 1  # do not move
-        self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
+        # self.scheduler.last_epoch = start_epoch - 1  # do not move
+        # self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
         self.__logger.info(
             f'{colorstr("bright_green", "Batch size")}: {self.config["batch_size"]} '
             f'({self.config["nominal_batch_size"]} nominal)\t'
@@ -128,7 +126,7 @@ class Trainer:
             progress_description: str = self.__train_one_epoch(train_dataloader=train_dataloader, epoch=epoch)
 
             # --- Scheduler ---
-            self.scheduler.step()
+            # self.scheduler.step()
             # self.exponential_moving_average.update_attr(self.model, include=[.....])
             is_final_epoch: bool = epoch + 1 == self.config["epochs"]
             if (not self.config["notest"] or is_final_epoch) and test_dataloader:
@@ -197,6 +195,8 @@ class Trainer:
             self.__logger.info(epoch_desc)
             # self.__logger.info(f"{'-' * 100}")
             results = [m.cpu().item() / batch_number for m in rolling_metrics]
+            # Test
+            self.model.train()
             return results
 
     def __train_one_epoch(self, train_dataloader: torch.utils.data.DataLoader, epoch: int):
@@ -207,30 +207,32 @@ class Trainer:
         batch_number: int = len(train_dataloader)
         progress_bar = tqdm(enumerate(train_dataloader), total=batch_number)
         # --- Zero gradient once and train batches ---
-        self.optimizer.zero_grad()
+        # self.optimizer.zero_grad()
 
         # Number of warmup iterations, max(config epochs (e.g., 3), 1k iterations)
-        warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)
+        # warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)
         for idx, (inputs, targets) in progress_bar:
             # --- Zero gradient ---
             self.optimizer.zero_grad()
             # --- Warmup if enabled ---
-            inputs, n_integrated_batches = self.__warmup_batch(inputs, batch_number, epoch, idx, warmup_number)
+            # inputs, n_integrated_batches = self.__warmup_batch(inputs, batch_number, epoch, idx, warmup_number)
             # Autocast will cast to half precision the forward pass
-            with amp.autocast(enabled=self.device.type[:4] == "cuda"):
+            # with amp.autocast(enabled=self.device.type[:4] == "cuda"):
                 # --- Forward pass ---
-                preds = self.model(inputs)
-                loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
+            preds = self.model(inputs.to(self.config["device"]))
+            loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
 
             # --- Backward (not recommended to be under autocast) ---
-            self.gradient_scaler.scale(loss).backward()
-            # --- Optimization ---
-            if n_integrated_batches % self.accumulate == 0:
-                # Optimizer step and update
-                self.gradient_scaler.step(self.optimizer)
-                self.gradient_scaler.update()
-                # if self.exponential_moving_average:
-                #     self.exponential_moving_average.update(self.model)
+            loss.backward()
+            self.optimizer.step()
+            # self.gradient_scaler.scale(loss).backward()
+            # # --- Optimization ---
+            # if n_integrated_batches % self.accumulate == 0:
+            #     # Optimizer step and update
+            #     self.gradient_scaler.step(self.optimizer)
+            #     self.gradient_scaler.update()
+            #     # if self.exponential_moving_average:
+            #     #     self.exponential_moving_average.update(self.model)
 
             # --- Console logging ---
             mem: str = f'{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2g}G'
@@ -314,14 +316,14 @@ class Trainer:
             yaml.dump(self.config, f, sort_keys=False)
         return save_dir, weights_dir, last_ckpt, best_ckpt, results_file
 
-    def __setup_model(self, locally_pretrained: bool, **other_model_params) -> None:
+    def __setup_model(self, locally_pretrained: bool) -> None:
         # If pretrained, load checkpoint
         if locally_pretrained:
             self.checkpoint = torch.load(self.config["weights"], map_location=self.device)
             self.model = self.model_class(
                 config=self.config,
                 config_path=self.config["architecture_config"] or self.checkpoint['model'].yaml,
-                logger=self.__logger, **other_model_params,
+                logger=self.__logger
             ).to(self.device)
             state_dict = self.checkpoint['model'].float().state_dict()  # to FP32
             state_dict = intersect_dicts(state_dict, self.model.state_dict(), exclude=[])  # intersect
@@ -333,7 +335,7 @@ class Trainer:
         else:
             self.model = self.model_class(config=self.config,
                                           config_path=self.config["architecture_config"],
-                                          logger=self.__logger, **other_model_params).to(self.device)
+                                          logger=self.__logger).to(self.device)
 
     def __setup_gradient_accumulation(self) -> int:
         # If the total batch size is less than or equal to the nominal batch size, then accumulate is set to 1.
