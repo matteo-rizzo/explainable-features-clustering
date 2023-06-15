@@ -45,7 +45,7 @@ def main():
 
     train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=False),
                                                          n_splits=1,
-                                                         train_size=4040,
+                                                         train_size=10100,
                                                          test_size=1010, )
     train = torch.utils.data.DataLoader(train_subset,
                                         batch_size=train_config["batch_size"],
@@ -114,7 +114,7 @@ def simple_for():
 
     model = ConvNextWrapper(train_config).to(device)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-    criterion = CriterionFactory().get(CRITERION).to(device)
+    criterion = torch.nn.CrossEntropyLoss()
     model.train()
     norm = Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     for epoch in range(EPOCHS):
