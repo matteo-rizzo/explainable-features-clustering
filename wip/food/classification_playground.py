@@ -51,12 +51,12 @@ def main():
                                         batch_size=train_config["batch_size"],
                                         shuffle=True,
                                         num_workers=train_config["workers"],
-                                        drop_last=False)
+                                        drop_last=True)
     test = torch.utils.data.DataLoader(test_subset,
                                        batch_size=train_config["batch_size"],
                                        shuffle=False,
                                        num_workers=train_config["workers"],
-                                       drop_last=False)
+                                       drop_last=True)
 
     metric_collection = MetricCollection({
         'accuracy': torchmetrics.Accuracy(task="multiclass",
@@ -83,7 +83,7 @@ DEVICE_TYPE = "cuda:0"
 OPTIMIZER = "AdamW"
 LEARNING_RATE = 0.0001
 CRITERION = "CrossEntropyLoss"
-EPOCHS = 15
+EPOCHS = 5
 from torchvision.transforms import ToTensor, Resize, Compose, CenterCrop, Normalize
 
 def get_accuracy(logits, gt, total: int, correct: int):
@@ -98,18 +98,14 @@ def simple_for():
     with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
         hyp = yaml.safe_load(f)
 
-    train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=False),
-                                                         n_splits=1,
-                                                         train_size=4040,
-                                                         test_size=1010, )
-    train = torch.utils.data.DataLoader(train_subset,
+    train = torch.utils.data.DataLoader(Food101Dataset(train=True, augment=True),
                                         batch_size=train_config["batch_size"],
                                         shuffle=True,
                                         num_workers=train_config["workers"],
                                         drop_last=True)
-    test = torch.utils.data.DataLoader(test_subset,
+    test = torch.utils.data.DataLoader(Food101Dataset(train=False),
                                        batch_size=train_config["batch_size"],
-                                       shuffle=False,
+                                       shuffle=True,
                                        num_workers=train_config["workers"],
                                        drop_last=True)
 
