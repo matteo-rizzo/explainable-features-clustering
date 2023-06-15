@@ -84,13 +84,13 @@ class Trainer:
         self.__setup_model(locally_pretrained=locally_pretrained)
         self.__print_model()
         # --- Gradient accumulation ---
-        self.accumulate: int = self.__setup_gradient_accumulation()
+        # self.accumulate: int = self.__setup_gradient_accumulation()
 
         # --- Optimization ---
         self.__setup_optimizer()
-        self.loss_fn: torch.nn.modules.loss = self.__setup_criterion()
+        self.__setup_criterion()
         # TODO: make optional / modularize
-        self.scheduler: torch.optim.lr_scheduler = self.__setup_scheduler()
+        # self.scheduler: torch.optim.lr_scheduler = self.__setup_scheduler()
 
         # --- Exponential moving average ---
         # self.exponential_moving_average = ExponentialMovingAverageModel(self.model)
@@ -103,9 +103,8 @@ class Trainer:
             start_epoch, best_fitness = 0, 0.0
 
         results = (0,) * len(self.metrics)
-        self.scheduler.last_epoch = start_epoch - 1  # do not move
-        self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
-        # --------------------------------------
+        # self.scheduler.last_epoch = start_epoch - 1  # do not move
+        # self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
         self.__logger.info(
             f'{colorstr("bright_green", "Batch size")}: {self.config["batch_size"]} '
             f'({self.config["nominal_batch_size"]} nominal)\t'
@@ -127,7 +126,7 @@ class Trainer:
             progress_description: str = self.__train_one_epoch(train_dataloader=train_dataloader, epoch=epoch)
 
             # --- Scheduler ---
-            self.scheduler.step()
+            # self.scheduler.step()
             # self.exponential_moving_average.update_attr(self.model, include=[.....])
             is_final_epoch: bool = epoch + 1 == self.config["epochs"]
             if (not self.config["notest"] or is_final_epoch) and test_dataloader:
@@ -205,31 +204,34 @@ class Trainer:
         epoch_description: str = ""
         batch_number: int = len(train_dataloader)
         progress_bar = tqdm(enumerate(train_dataloader), total=batch_number)
+        # --- Zero gradient once and train batches ---
+        # self.optimizer.zero_grad()
 
         # Number of warmup iterations, max(config epochs (e.g., 3), 1k iterations)
-        warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)
+        # warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)
         for idx, (inputs, targets) in progress_bar:
             # --- Zero gradient ---
             self.optimizer.zero_grad()
             # --- Warmup if enabled ---
-            inputs, n_integrated_batches = self.__warmup_batch(inputs, batch_number, epoch, idx, warmup_number)
+            # inputs, n_integrated_batches = self.__warmup_batch(inputs, batch_number, epoch, idx, warmup_number)
             # Autocast will cast to half precision the forward pass
-            with amp.autocast(enabled=self.device.type[:4] == "cuda"):
+            # with amp.autocast(enabled=self.device.type[:4] == "cuda"):
                 # --- Forward pass ---
-                preds = self.model(inputs.to(self.config["device"]))
-                loss = self.loss_fn(preds, targets.to(self.config["device"]))
+            preds = self.model(inputs.to(self.config["device"]))
+            loss = self.loss_fn(preds, targets.to(self.config["device"]))
+            # loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
 
             # --- Backward (not recommended to be under autocast) ---
-            # loss.backward()
-            # self.optimizer.step()
-            self.gradient_scaler.scale(loss).backward()
+            loss.backward()
+            self.optimizer.step()
+            # self.gradient_scaler.scale(loss).backward()
             # # --- Optimization ---
-            if n_integrated_batches % self.accumulate == 0:
-                # Optimizer step and update
-                self.gradient_scaler.step(self.optimizer)
-                self.gradient_scaler.update()
-                # if self.exponential_moving_average:
-                #     self.exponential_moving_average.update(self.model)
+            # if n_integrated_batches % self.accumulate == 0:
+            #     # Optimizer step and update
+            #     self.gradient_scaler.step(self.optimizer)
+            #     self.gradient_scaler.update()
+            #     # if self.exponential_moving_average:
+            #     #     self.exponential_moving_average.update(self.model)
 
             # --- Console logging ---
             mem: str = f'{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2g}G'
@@ -371,8 +373,8 @@ class Trainer:
                                          lr=self.hyperparameters["lr0"],
                                          betas=(self.hyperparameters['momentum'], 0.999))
 
-    def __setup_criterion(self) -> torch.nn.modules.loss:
-        return CriterionFactory().get(self.config["criterion"])
+    def __setup_criterion(self):
+        self.loss_fn = CriterionFactory().get(self.config["criterion"])
 
     def __setup_activation(self) -> torch.nn.modules.loss:
         return ActivationFactory().get(self.config["inference"])
