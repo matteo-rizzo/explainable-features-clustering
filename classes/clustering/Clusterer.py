@@ -78,9 +78,10 @@ class Clusterer:
             clusters_ranking.append((i, cluster_variance / np.mean(cluster_distance)))
 
         # print(silhouette_score(data, labels))
-        print(silhouette_score(data, labels))
         print(calinski_harabasz_score(data, labels))
         print(davies_bouldin_score(data, labels))
+        print(silhouette_score(data, labels))
+
         clusters_ranking = sorted(clusters_ranking, key=lambda x: x[1], reverse=True)
         if print_values:
             for i, ranking in enumerate(clusters_ranking):
