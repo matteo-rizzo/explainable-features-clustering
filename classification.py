@@ -20,13 +20,8 @@ from classes.deep_learning.models.ModelImportanceWeightedCNN import ModelImporta
 from functional.data_utils import create_stratified_splits
 from functional.torch_utils import get_device
 
-PLOT = False
-NUM_WORDS = 10
-DEVICE_TYPE = "cpu"
-OPTIMIZER = "SGD"
-LEARNING_RATE = 0.01
-CRITERION = "CrossEntropyLoss"
-EPOCHS = 15
+PLOT = True
+NUM_WORDS = 100
 
 
 def main():
@@ -37,8 +32,8 @@ def main():
         config: dict = yaml.safe_load(f)
     with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
         hyperparameters: dict = yaml.safe_load(f)
-    with open('config/feature_extraction.yaml', 'r') as f:
-        feature_extraction_config: dict = yaml.safe_load(f)
+    # with open('config/shi_thomasi_feature_extraction.yaml', 'r') as f:
+    #     feature_extraction_config: dict = yaml.safe_load(f)
     with open('config/clustering/clustering_params.yaml', 'r') as f:
         clustering_config: dict = yaml.safe_load(f)
     # --- Data loaders ---
@@ -55,7 +50,7 @@ def main():
 
     # TODO: Working on a subsample
     train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True),
-                                                         n_splits=1, train_size=700, test_size=300)
+                                                         n_splits=1, train_size=5050, test_size=303)
     train_loader = torch.utils.data.DataLoader(train_subset,
                                         batch_size=config["batch_size"],
                                         shuffle=True,
@@ -68,10 +63,9 @@ def main():
                                        drop_last=True)
 
     # --- Feature extraction ---
-    key_points_extractor = FeatureExtractingAlgorithm(algorithm="SHI-TOMASI_BOX", multi_scale=False,
-                                                      logger=logger, **feature_extraction_config)
+    key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
 
-    keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
+    keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader, rgb=True)
     # gather all descriptors in a single big array
     flat_descriptors = np.concatenate(descriptors)
     # --- Clustering ---

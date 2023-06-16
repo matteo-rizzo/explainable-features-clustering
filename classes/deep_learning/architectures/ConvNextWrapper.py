@@ -8,7 +8,7 @@ class ConvNextWrapper(nn.Module):
 
     def __init__(self, config: dict, **kwargs):
         super().__init__()
-        pretrained_model = convnext_tiny(weights='DEFAULT')  # model
+        pretrained_model = convnext_base(weights='DEFAULT')  # model
         n_inputs = pretrained_model.classifier._modules['2'].in_features
         # This is the same classifier they use in the paper, just replacing the head
         sequential_layers = nn.Sequential(

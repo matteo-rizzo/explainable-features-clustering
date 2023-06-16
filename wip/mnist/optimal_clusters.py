@@ -188,7 +188,7 @@ def main():
     # --- Config ---
     with open('config/training/training_configuration.yaml', 'r') as f:
         generic_config: dict = yaml.safe_load(f)
-    with open('config/feature_extraction.yaml', 'r') as f:
+    with open('config/shi_thomasi_feature_extraction.yaml', 'r') as f:
         feature_extraction_config: dict = yaml.safe_load(f)
     # --- Logger ---
     logger = default_logger(generic_config["logger"])

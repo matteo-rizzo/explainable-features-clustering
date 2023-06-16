@@ -84,6 +84,7 @@ class Trainer:
         self.__setup_model(locally_pretrained=locally_pretrained)
         self.__print_model()
         # --- Gradient accumulation ---
+        # TODO: not enabled
         # self.accumulate: int = self.__setup_gradient_accumulation()
 
         # --- Optimization ---
