@@ -6,13 +6,13 @@ import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
 from tqdm import tqdm
-from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
+from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score
 from functional.utils import print_minutes, log_on_default
 
 try:
     # Nvidia rapids / cuml gpu support
     from cuml.cluster import AgglomerativeClustering, KMeans, HDBSCAN
-
+    from cuml.metrics.cluster import silhouette_score
     DEVICE: str = "GPU"
 except ImportError:
     # Standard cpu support
@@ -77,6 +77,7 @@ class Clusterer:
             # Also changed, perché voglio valori medi
             clusters_ranking.append((i, cluster_variance / np.mean(cluster_distance)))
 
+        # print(silhouette_score(data, labels))
         print(silhouette_score(data, labels))
         print(calinski_harabasz_score(data, labels))
         print(davies_bouldin_score(data, labels))
