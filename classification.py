@@ -16,11 +16,12 @@ from classes.clustering.KMeansClustering import KMeansClustering
 from classes.core.Trainer import Trainer
 from classes.data.Food101Dataset import Food101Dataset
 from classes.data.MNISTDataset import MNISTDataset
+from classes.data.Vocabulary import Vocabulary
 from classes.deep_learning.models.ModelImportanceWeightedCNN import ModelImportanceWeightedCNN
 from functional.data_utils import create_stratified_splits
 from functional.torch_utils import get_device
 
-PLOT = True
+PLOT = False
 NUM_WORDS = 100
 
 
@@ -50,7 +51,7 @@ def main():
 
     # TODO: Working on a subsample
     train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True),
-                                                         n_splits=1, train_size=5050, test_size=303)
+                                                         n_splits=1, train_size=5050, test_size=1010)
     train_loader = torch.utils.data.DataLoader(train_subset,
                                         batch_size=config["batch_size"],
                                         shuffle=True,
@@ -65,17 +66,19 @@ def main():
     # --- Feature extraction ---
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
 
-    keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader, rgb=True)
-    # gather all descriptors in a single big array
-    flat_descriptors = np.concatenate(descriptors)
+    train_keypoints, train_descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader, rgb=True)
+    test_keypoints, test_descriptors = key_points_extractor.get_keypoints_and_descriptors(test_loader, rgb=True)
+    # Gather all descriptors in a single big array
+    flat_train_descriptors = np.concatenate(train_descriptors)
+    flat_test_descriptors = np.concatenate(test_descriptors)
     # --- Clustering ---
     clusterer = Clusterer(algorithm="KMEANS", logger=logger, **clustering_config["kmeans_args"])
-    labels = clusterer.fit_predict(flat_descriptors)
+    labels = clusterer.fit_predict(flat_train_descriptors)
     centroids = clusterer.get_centroids()
     # --- Cluster plotting ---
     if PLOT:
         dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", logger=logger, **clustering_config["umap_args_2d"])
-        vectors_2d = dimensionality_reducer.fit_transform(flat_descriptors)
+        vectors_2d = dimensionality_reducer.fit_transform(flat_train_descriptors)
         clusterer.plot(vectors_2d, labels, "KMEANS")
     # Plot the data points and centroids
     # if PLOT:
@@ -83,9 +86,10 @@ def main():
     #     plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=100, linewidths=3, c='k')
     #     plt.show()
 
-    ranking = clusterer.rank_clusters(flat_descriptors, centroids, labels)
+    ranking = clusterer.rank_clusters(flat_train_descriptors, centroids, labels, print_values=True)
     words = [centroids[cluster_label] for (cluster_label, _) in ranking[:NUM_WORDS]]
 
+    vocab = Vocabulary(words)
     # device = get_device(DEVICE_TYPE)
     #
     # model = ModelImportanceWeightedCNN(device, words)

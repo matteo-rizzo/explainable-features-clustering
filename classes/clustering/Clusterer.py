@@ -6,7 +6,7 @@ import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
 from tqdm import tqdm
-
+from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
 from functional.utils import print_minutes, log_on_default
 
 try:
@@ -65,12 +65,21 @@ class Clusterer:
 
     @staticmethod
     def rank_clusters(data: np.ndarray, centroids: np.ndarray, labels: list | np.ndarray, print_values: bool = False) -> list[tuple]:
+        # TODO: check
         clusters_ranking = []
-        for i in tqdm(range(np.max(labels) + 1), desc="Ranking clusters"):
-            cluster_variance = np.var(data[labels == i], axis=0)
+        # Labels are assumed to be in range [0-num_labels]
+        for i in tqdm(range(len(np.unique(labels))), desc="Ranking clusters"):
+            cluster_variance = np.var(data[labels == i])
+            # Tolgo axis = 0, perché in quel modo stai calcolando la varianza delle feature separate
+            # E le feature di SIFT sono interdipendenti
+            # cluster_variance = np.var(data[labels == i], axis=0)
             cluster_distance = np.linalg.norm(data[labels == i] - centroids[i], axis=1)
-            clusters_ranking.append((i, np.sum(cluster_variance) / np.sum(cluster_distance)))
+            # Also changed, perché voglio valori medi
+            clusters_ranking.append((i, cluster_variance / np.mean(cluster_distance)))
 
+        print(silhouette_score(data, labels))
+        print(calinski_harabasz_score(data, labels))
+        print(davies_bouldin_score(data, labels))
         clusters_ranking = sorted(clusters_ranking, key=lambda x: x[1], reverse=True)
         if print_values:
             for i, ranking in enumerate(clusters_ranking):
