@@ -74,14 +74,16 @@ class Trainer:
         self.__logger.addHandler(ch)
 
     def train(self, train_dataloader: torch.utils.data.DataLoader,
-              test_dataloader: torch.utils.data.DataLoader = None):
+              test_dataloader: torch.utils.data.DataLoader = None,
+              **other_model_params):
         # --- Directories, initialize where things are saved ---
         self.__start_or_resume_config()
         save_dir, weights_dir, last_ckpt, best_ckpt, results_file = self.__init_dump_folder()
 
         # --- Model ---
         locally_pretrained: bool = self.config["weights"].endswith('.pt')
-        self.__setup_model(locally_pretrained=locally_pretrained)
+        self.__setup_model(locally_pretrained=locally_pretrained,
+                           **other_model_params)
         self.__print_model()
         # --- Gradient accumulation ---
         # TODO: not enabled
@@ -118,7 +120,8 @@ class Trainer:
             f'{" " * 31}{colorstr("bright_green", "Starting training for")} '
             f'{self.config["epochs"]} epochs...')
 
-        torch.save(self.model, weights_dir / 'init.pt')
+        # FIXME: frikcing cv2...
+        # torch.save(self.model, weights_dir / 'init.pt')
         epoch: int = -1
         t0 = time.time()
         # Start training ------------------------------------------------------------------------
@@ -317,14 +320,16 @@ class Trainer:
             yaml.dump(self.config, f, sort_keys=False)
         return save_dir, weights_dir, last_ckpt, best_ckpt, results_file
 
-    def __setup_model(self, locally_pretrained: bool) -> None:
+    def __setup_model(self, locally_pretrained: bool,
+                      **other_model_params) -> None:
         # If pretrained, load checkpoint
         if locally_pretrained:
             self.checkpoint = torch.load(self.config["weights"], map_location=self.device)
             self.model = self.model_class(
                 config=self.config,
                 config_path=self.config["architecture_config"] or self.checkpoint['model'].yaml,
-                logger=self.__logger
+                logger=self.__logger,
+                **other_model_params
             ).to(self.device)
             state_dict = self.checkpoint['model'].float().state_dict()  # to FP32
             state_dict = intersect_dicts(state_dict, self.model.state_dict(), exclude=[])  # intersect
@@ -336,7 +341,8 @@ class Trainer:
         else:
             self.model = self.model_class(config=self.config,
                                           config_path=self.config["architecture_config"],
-                                          logger=self.__logger).to(self.device)
+                                          logger=self.__logger,
+                                          **other_model_params).to(self.device)
 
     def __setup_gradient_accumulation(self) -> int:
         # If the total batch size is less than or equal to the nominal batch size, then accumulate is set to 1.

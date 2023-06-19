@@ -1,11 +1,11 @@
 import time
 
 import torch
+import torchvision.transforms as T
 import yaml
 from matplotlib import pyplot as plt
 from torch.utils.data import Dataset
 from torchvision.datasets import Food101
-import torchvision.transforms as T
 from tqdm import tqdm
 
 from functional.data_utils import get_transform
@@ -22,11 +22,11 @@ class Food101Dataset(Dataset):
                 T.Resize(224),
                 T.CenterCrop((224, 224)),
                 T.ToTensor(),
-                T.Normalize((0.5,),(0.5,)),
+                T.Normalize((0.5,), (0.5,)),
             ])
 
         self.data = Food101(root=root,
-        transform=transform,
+                            transform=transform,
                             split="train" if train else "test",
                             download=True)
 

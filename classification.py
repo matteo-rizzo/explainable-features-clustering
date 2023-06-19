@@ -4,22 +4,17 @@ import numpy as np
 import torch
 import torchmetrics
 import yaml
-from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
-from tqdm import tqdm
 
 from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.clustering.Clusterer import Clusterer
 from classes.clustering.DimensionalityReducer import DimensionalityReducer
-from classes.clustering.KMeansClustering import KMeansClustering
 from classes.core.Trainer import Trainer
 from classes.data.Food101Dataset import Food101Dataset
-from classes.data.MNISTDataset import MNISTDataset
 from classes.data.Vocabulary import Vocabulary
-from classes.deep_learning.models.ModelImportanceWeightedCNN import ModelImportanceWeightedCNN
+from classes.deep_learning.architectures.FeedForwardNet import FeedForwardNet
 from functional.data_utils import create_stratified_splits
-from functional.torch_utils import get_device
 
 PLOT = False
 NUM_WORDS = 100
@@ -53,15 +48,15 @@ def main():
     train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True),
                                                          n_splits=1, train_size=505, test_size=101)
     train_loader = torch.utils.data.DataLoader(train_subset,
-                                        batch_size=config["batch_size"],
-                                        shuffle=True,
-                                        num_workers=config["workers"],
-                                        drop_last=True)
+                                               batch_size=config["batch_size"],
+                                               shuffle=True,
+                                               num_workers=config["workers"],
+                                               drop_last=True)
     test_loader = torch.utils.data.DataLoader(test_subset,
-                                       batch_size=config["batch_size"],
-                                       shuffle=True,
-                                       num_workers=config["workers"],
-                                       drop_last=True)
+                                              batch_size=config["batch_size"],
+                                              shuffle=True,
+                                              num_workers=config["workers"],
+                                              drop_last=True)
 
     # --- Feature extraction ---
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
@@ -77,7 +72,8 @@ def main():
     centroids = clusterer.get_centroids()
     # --- Cluster plotting ---
     if PLOT:
-        dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", logger=logger, **clustering_config["umap_args_2d"])
+        dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", logger=logger,
+                                                       **clustering_config["umap_args_2d"])
         vectors_2d = dimensionality_reducer.fit_transform(flat_train_descriptors)
         clusterer.plot(vectors_2d, labels, "KMEANS")
     # Plot the data points and centroids
@@ -89,17 +85,18 @@ def main():
     ranking = clusterer.rank_clusters(flat_train_descriptors, centroids, labels, print_values=True)
     words = [centroids[cluster_label] for (cluster_label, _) in ranking[:NUM_WORDS]]
 
-    vocab = Vocabulary(words)
+    vocab = Vocabulary(words, clusterer)
 
-    for (x, y) in tqdm(train_loader):
-        # print(x.shape, y)
-        # plt.imshow(x.squeeze(0).permute(1, 2, 0))
-        # plt.text(0, -12, str(train_loader.dataset.data.classes[y.item()]), color='green', fontsize=14, ha='left',
-        #          va='top')
-        # plt.show()
-
-        embedding = vocab.embed(x)
-        print(embedding)
+    # for (x, y) in tqdm(train_loader):
+    #     # print(x.shape, y)
+    #     # plt.imshow(x.squeeze(0).permute(1, 2, 0))
+    #     # plt.text(0, -12, str(train_loader.dataset.data.classes[y.item()]), color='green', fontsize=14, ha='left',
+    #     #          va='top')
+    #     # plt.show()
+    #
+    #     # embedding = vocab.embed(x)
+    #     # bs, 1, 1, 22500
+    #     print(x)
 
     # device = get_device(DEVICE_TYPE)
     #
@@ -138,18 +135,19 @@ def main():
     #           f'test accuracy: {test_accuracy:.3f}')
     #
     # # ----------------------------------------------------------------------
-    # # --- Metrics for training ---
-    # metric_collection = MetricCollection({
-    #     'accuracy': torchmetrics.Accuracy(task="multiclass", num_classes=10),
-    #     'precision': torchmetrics.Precision(task="multiclass", num_classes=10, average="macro"),
-    #     'recall': torchmetrics.Recall(task="multiclass", num_classes=10, average="macro"),
-    #     "F1": torchmetrics.F1Score(task="multiclass", num_classes=10, average="macro")
-    # })
+    # --- Metrics for training ---
+    metric_collection = MetricCollection({
+        'accuracy': torchmetrics.Accuracy(task="multiclass", num_classes=10),
+        'precision': torchmetrics.Precision(task="multiclass", num_classes=10, average="macro"),
+        'recall': torchmetrics.Recall(task="multiclass", num_classes=10, average="macro"),
+        "F1": torchmetrics.F1Score(task="multiclass", num_classes=10, average="macro")
+    })
     # # --- Training ---
-    # trainer = Trainer(ModelImportanceWeightedCNN, config=config,
-    #                   hyperparameters=hyperparameters,
-    #                   metric_collection=metric_collection, logger=logger)
-    # trainer.train(train_loader, test_loader)
+    trainer = Trainer(FeedForwardNet, config=config,
+                      hyperparameters=hyperparameters,
+                      metric_collection=metric_collection,
+                      logger=logger)
+    trainer.train(train_loader, test_loader, vocab=vocab)
 
 
 if __name__ == "__main__":

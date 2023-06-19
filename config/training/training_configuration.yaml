@@ -1,7 +1,7 @@
 # ---------- Data configuration ----------
 num_classes: 101
 img_size: 224
-num_channels: 3
+num_channels: 11250
 
 # --- Training operative configuration ---
 device: "cuda:0" # Cuda device, i.e. 0 or 0,1,2,3 or cpu
@@ -16,7 +16,7 @@ inference: "Softmax" # [Softmax, Sigmoid]
 linear_lr: False # linear learning rate (decay)
 
 resume: False # Resume most recent training. True = latest, can be string to a specific checkpoint
-nosave: False # Only save final checkpoint
+nosave: True # Only save final checkpoint
 notest: False # Only test final epoch
 logger: "INFO"
 
@@ -28,7 +28,7 @@ weights: "" # Initial weights path
 hyperparameters: "config/training/hypeparameter_configuration.yaml"  # Hyperparameters path
 project: "dumps/train" # save to project/name
 # TODO: automatize
-name: "cnn_train" # save to project/name
+name: "fcc_train" # save to project/name
 exist_ok: False # existing project/name ok, do not increment
 
 # TODO: ---

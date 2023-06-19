@@ -10,7 +10,7 @@ from torch import Tensor
 
 
 def normalize_img(img: Tensor) -> np.ndarray:
-    return (img.numpy() * 255).astype(np.uint8)
+    return (img.cpu().numpy() * 255).astype(np.uint8)
 
 
 def intersect_dicts(dict_a: dict, dict_b: dict, exclude=()):

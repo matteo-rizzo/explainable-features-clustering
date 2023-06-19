@@ -54,6 +54,9 @@ class Clusterer:
         self.__clusterer.fit(vectors)
         print_minutes(seconds=(time.perf_counter() - t0), input_str=self.__algorithm_name, logger=self.__logger)
 
+    def predict(self, vector: np.ndarray):
+        return self.__clusterer.predict(vector)
+
     def score(self, vectors: np.ndarray) -> float:
         return self.__clusterer.score(vectors)
 
@@ -66,7 +69,7 @@ class Clusterer:
 
     @staticmethod
     def rank_clusters(data: np.ndarray, centroids: np.ndarray, labels: list | np.ndarray, print_values: bool = False) -> \
-    list[tuple]:
+            list[tuple]:
         # TODO: check
         clusters_ranking = []
         # Labels are assumed to be in range [0-num_labels]
