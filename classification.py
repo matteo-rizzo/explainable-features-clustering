@@ -51,7 +51,7 @@ def main():
 
     # TODO: Working on a subsample
     train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True),
-                                                         n_splits=1, train_size=5050, test_size=1010)
+                                                         n_splits=1, train_size=505, test_size=101)
     train_loader = torch.utils.data.DataLoader(train_subset,
                                         batch_size=config["batch_size"],
                                         shuffle=True,
@@ -90,6 +90,17 @@ def main():
     words = [centroids[cluster_label] for (cluster_label, _) in ranking[:NUM_WORDS]]
 
     vocab = Vocabulary(words)
+
+    for (x, y) in tqdm(train_loader):
+        # print(x.shape, y)
+        # plt.imshow(x.squeeze(0).permute(1, 2, 0))
+        # plt.text(0, -12, str(train_loader.dataset.data.classes[y.item()]), color='green', fontsize=14, ha='left',
+        #          va='top')
+        # plt.show()
+
+        embedding = vocab.embed(x)
+        print(embedding)
+
     # device = get_device(DEVICE_TYPE)
     #
     # model = ModelImportanceWeightedCNN(device, words)

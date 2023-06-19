@@ -6,18 +6,19 @@ import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
 from tqdm import tqdm
-from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score
+
 from functional.utils import print_minutes, log_on_default
 
 try:
     # Nvidia rapids / cuml gpu support
     from cuml.cluster import AgglomerativeClustering, KMeans, HDBSCAN
-    from cuml.metrics.cluster import silhouette_score
+
     DEVICE: str = "GPU"
 except ImportError:
     # Standard cpu support
     from sklearn.cluster import AgglomerativeClustering, KMeans
     from hdbscan import HDBSCAN
+
     DEVICE: str = "CPU"
 
 log_on_default("INFO", f"Importing clustering algorithms with {DEVICE} support.")
@@ -64,7 +65,8 @@ class Clusterer:
         return self.__clusterer.cluster_centers_
 
     @staticmethod
-    def rank_clusters(data: np.ndarray, centroids: np.ndarray, labels: list | np.ndarray, print_values: bool = False) -> list[tuple]:
+    def rank_clusters(data: np.ndarray, centroids: np.ndarray, labels: list | np.ndarray, print_values: bool = False) -> \
+    list[tuple]:
         # TODO: check
         clusters_ranking = []
         # Labels are assumed to be in range [0-num_labels]
@@ -78,9 +80,11 @@ class Clusterer:
             clusters_ranking.append((i, cluster_variance / np.mean(cluster_distance)))
 
         # print(silhouette_score(data, labels))
-        print(calinski_harabasz_score(data, labels))
-        print(davies_bouldin_score(data, labels))
-        print(silhouette_score(data, labels))
+        # Calinski-Harabasz index and Davies-Bouldin index evaluate the overall quality of clustering based on
+        # different aspects, such as variance ratios and cluster similarities.
+        # print(calinski_harabasz_score(data, labels))
+        # print(davies_bouldin_score(data, labels))
+        # print(silhouette_score(data, labels))
 
         clusters_ranking = sorted(clusters_ranking, key=lambda x: x[1], reverse=True)
         if print_values:
@@ -117,7 +121,6 @@ class Clusterer:
             fig.savefig(f'plots/{name}_2d.png', dpi=fig.dpi)
         else:
             plt.show()
-
 
     @staticmethod
     def plot_3d(vectors, labels, name: str = "", save: bool = False):

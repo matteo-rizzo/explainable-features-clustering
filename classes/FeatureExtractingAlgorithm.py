@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from classes.CornerExtractingAlgorithm import CornerExtractingAlgorithm
 from functional.utils import normalize_img
-
+from torch import Tensor
 
 class FeatureExtractingAlgorithm:
 
@@ -83,18 +83,32 @@ class FeatureExtractingAlgorithm:
         plt.show()
         plt.clf()
 
-    def get_keypoints_and_descriptors(self, data: DataLoader, rgb: bool = False) -> Tuple[List, List]:
+    def get_keypoints_and_descriptors(self, data: DataLoader | Tensor, rgb: bool = False) \
+            -> Tuple[List, List] | Tuple[Tuple, Optional[np.ndarray]]:
         descriptors, keypoints = [], []
-        for (images, _) in tqdm(data, desc=f"Generating keypoints and descriptors using {self.__algorithm_name}"):
-            for i in range(images.shape[0]):
-                img = normalize_img(images[i]).squeeze()
-                if rgb:
-                    img = cv2.cvtColor(img.transpose((1, 2, 0)), cv2.COLOR_RGB2BGR)
-                img_keypoints, img_descriptors = self.run(img)
-                if img_descriptors is not None:
-                    keypoints.append(img_keypoints)
-                    descriptors.append(img_descriptors)
-        return keypoints, descriptors
+        # ----------------------------------------------
+        if isinstance(data, DataLoader):
+            for (images, _) in tqdm(data, desc=f"Generating keypoints and descriptors using {self.__algorithm_name}"):
+                for i in range(images.shape[0]):
+                    img = normalize_img(images[i]).squeeze()
+                    if rgb:
+                        img = cv2.cvtColor(img.transpose((1, 2, 0)), cv2.COLOR_RGB2BGR)
+                    img_keypoints, img_descriptors = self.run(img)
+                    if img_descriptors is not None:
+                        keypoints.append(img_keypoints)
+                        descriptors.append(img_descriptors)
+            return keypoints, descriptors
+        # ----------------------------------------------
+        # Single image
+        elif isinstance(data, Tensor):
+            img = normalize_img(data).squeeze()
+            if rgb:
+                img = cv2.cvtColor(img.transpose((1, 2, 0)), cv2.COLOR_RGB2BGR)
+            return self.run(img)
+        # ----------------------------------------------
+        else:
+            raise ValueError("Data should be either Tensor or Dataloader")
+
 
 
 if __name__ == "__main__":
