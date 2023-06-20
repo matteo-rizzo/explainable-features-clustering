@@ -11,7 +11,7 @@ from classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtract
 from classes.clustering.Clusterer import Clusterer
 from classes.clustering.DimensionalityReducer import DimensionalityReducer
 from classes.core.Trainer import Trainer
-from classes.data.Food101Dataset import Food101Dataset
+from classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from classes.data.Vocabulary import Vocabulary
 from classes.deep_learning.FeedForwardNet import FeedForwardNet
 from functional.data_utils import create_stratified_splits
@@ -44,15 +44,14 @@ def main():
     #                                    num_workers=config["workers"],
     #                                    drop_last=True)
 
-    # TODO: Working on a subsample
-    train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=False),
-                                                         n_splits=1, train_size=505, test_size=101)
-    train_loader = torch.utils.data.DataLoader(train_subset,
+    # train_subset, test_subset = create_stratified_splits(OxfordIIITPetDataset(train=True, augment=False),
+    #                                                      n_splits=1, train_size=505, test_size=101)
+    train_loader = torch.utils.data.DataLoader(OxfordIIITPetDataset(train=True, augment=False),
                                                batch_size=config["batch_size"],
                                                shuffle=True,
                                                num_workers=config["workers"],
                                                drop_last=True)
-    test_loader = torch.utils.data.DataLoader(test_subset,
+    test_loader = torch.utils.data.DataLoader(OxfordIIITPetDataset(train=True, augment=False),
                                               batch_size=config["batch_size"],
                                               shuffle=True,
                                               num_workers=config["workers"],
@@ -139,17 +138,18 @@ def main():
     metric_collection = MetricCollection({
         'accuracy': torchmetrics.Accuracy(task="multiclass",
                                           num_classes=config["num_classes"]),
-        'precision': torchmetrics.Precision(task="multiclass",
-                                            num_classes=config["num_classes"],
-                                            average="macro"),
-        'recall': torchmetrics.Recall(task="multiclass",
-                                      num_classes=config["num_classes"],
-                                      average="macro"),
-        "F1": torchmetrics.F1Score(task="multiclass",
-                                   num_classes=config["num_classes"],
-                                   average="macro")
+        # 'precision': torchmetrics.Precision(task="multiclass",
+        #                                     num_classes=config["num_classes"],
+        #                                     average="macro"),
+        # 'recall': torchmetrics.Recall(task="multiclass",
+        #                               num_classes=config["num_classes"],
+        #                               average="macro"),
+        # "F1": torchmetrics.F1Score(task="multiclass",
+        #                            num_classes=config["num_classes"],
+        #                            average="macro")
     })
     # # --- Training ---
+    # TODO: Transformer?
     trainer = Trainer(FeedForwardNet,
                       config=config,
                       hyperparameters=hyperparameters,

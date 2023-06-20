@@ -1,13 +1,13 @@
 # ---------- Data configuration ----------
-num_classes: 101
+num_classes: 37 # Food 101 / Pets 37
 img_size: 224
-num_channels: 11250
+num_channels: 8192
 
 # --- Training operative configuration ---
 device: "cuda:0" # Cuda device, i.e. 0 or 0,1,2,3 or cpu
 workers: 0 # Maximum number of dataloader workers
-batch_size: 40 # Total batch size for all GPUs
-nominal_batch_size: 40 # ONLY IF ACCUMULATE TRUE
+batch_size: 30 # Total batch size for all GPUs
+#nominal_batch_size: 20 # ONLY IF ACCUMULATE TRUE
 
 epochs: 10 # Number of training epochs
 

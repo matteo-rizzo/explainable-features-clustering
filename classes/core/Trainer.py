@@ -110,20 +110,25 @@ class Trainer:
         # --------------------------------------
         results = (0,) * len(self.metrics)
         self.scheduler.last_epoch = start_epoch - 1  # do not move
-        self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
+        if self.do_half:
+            self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
         self.__logger.info(
-            f'{colorstr("bright_green", "Batch size")}: {self.config["batch_size"]} '
-            f'({self.config["nominal_batch_size"]} nominal)\t'
+            f'{colorstr("bright_green", "Batch size")}: {self.config["batch_size"]} \t'
+            # f'({self.config["nominal_batch_size"]} nominal)\t'
             f'{colorstr("bright_green", "Dataloader workers")}: {train_dataloader.num_workers}\t'
             f'{colorstr("bright_green", "Saving results to")}: {save_dir}\n'
             f'{" " * 31}{colorstr("bright_green", "Optimizer")}: {self.config["optimizer"]}\t '
             f'{colorstr("bright_green", "Learning rate")}: {self.hyperparameters["lr0"]}\t'
             f'{colorstr("bright_green", "Model")}: {self.model.__class__.__name__}\t'
             f'{colorstr("bright_green", "Inference activation function")}: {self.config["inference"]}\n'
+            f'{" " * 31}'
+            f'{colorstr("bright_green", "Dataset:")}: {train_dataloader.dataset.__class__.__name__}\t'
+            f'{colorstr("bright_green", "Half precision training:")}: {"Yes" if self.config["half_precision"] else "No"}\t'
+            f'{colorstr("bright_green", "Learning rate decay")}: {"Linear" if self.config["linear_lr"] else "One cycle"}\n'
             f'{" " * 31}{colorstr("bright_green", "Starting training for")} '
             f'{self.config["epochs"]} epochs...')
         # --------------------------------------
-        torch.save(self.model, weights_dir / 'init.pt')
+        # torch.save(self.model, weights_dir / 'init.pt')
         epoch: int = -1
         t0 = time.time()
         # ---------------------------------------------------------------------------------------
@@ -173,13 +178,14 @@ class Trainer:
         rolling_metrics = [torch.tensor(0.0, device=self.device), ] * len(self.metrics)
         # --------------------------------------
         for idx, (inputs, targets) in progress_bar:
-            inputs = inputs.to(self.device, non_blocking=True)
+            inputs = inputs.to(self.device)
             targets = targets.to(self.device)
             with torch.no_grad():
                 pred_logits = self.model(inputs)
                 # Softmax/Sigmoid/Whatever selected
                 preds = self.activation(pred_logits)
                 result_dict = self.metrics(preds, targets)
+                # TODO: ROLLING MACRO METRICS = WRONG
                 rolling_metrics = [x + y for x, y in zip(rolling_metrics, result_dict.values())]
                 batch_desc = f"{colorstr('bold', 'white', '[TEST]' if not on_train else '[TRAIN]')}\t"
                 for metric_name, metric_value in zip(result_dict.keys(), rolling_metrics):

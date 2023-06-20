@@ -31,7 +31,6 @@ class Vocabulary:
             matches[-1] = histogram_edge  # Add 1 to "no keypoints" embedding
             return matches
         else:
-            # TODO: maybe GMM to  have probabilities?
             for kp in found_kps:
                 # a = self.clusterer.predict(kp)
                 a = self.clusterer.predict(np.expand_dims(kp, 0))
@@ -40,7 +39,7 @@ class Vocabulary:
                 # word_match = []
                 # for word_index, word in enumerate(self.words):
                 #     self.words
-                    # res = cv2.matc hTemplate(word, kp, cv2.TM_CCOEFF_NORMED)
+                    # res = cv2.matchTemplate(word, kp, cv2.TM_CCOEFF_NORMED)
                     # word_match.append(-1 if res[0][0] < threshold else word_index)
                 # matches.append(word_match)
 
@@ -90,8 +89,9 @@ class Vocabulary:
             # TODO: parametrize rgb
             # keypoints, descriptors = self.__feature_extractor.get_keypoints_and_descriptors(img, rgb=True)
             # # Sort the keypoints based on y-axis first and x-axis second
-            # sorted_keypoints = sorted(keypoints, key=lambda kp: (kp.pt[1], kp.pt[0]))
 
+            # sorted_keypoints = sorted(keypoints, key=lambda kp: (kp.pt[1], kp.pt[0]))
+            centroids = self.clusterer.get_centroids()
             keypoints, descriptors = self.feature_extractor.get_keypoints_and_descriptors(img, rgb=True)
             # Sort keypoints and descriptors together based on y-axis first and x-axis second
             sorted_data = sorted(zip(keypoints, descriptors), key=lambda data: (data[0].pt[1], data[0].pt[0]))
@@ -102,17 +102,17 @@ class Vocabulary:
                 for width in range(0, img.shape[2] - win_w + 1, stride):
                     # Extract the window from the image
                     # window = img[:, height_index:height_index + win_w, width_index:width_index + win_w]
-                    left = width
-                    right = width + win_w
-                    top = height
-                    bottom = height + win_h
+                    # left = width
+                    # right = width + win_w
+                    # top = height
+                    # bottom = height + win_h
                     found_kps = []
                     # Embed the window
                     for idx, kp in enumerate(sorted_keypoints):
                         x, y = kp.pt
                         if height < y < height + win_w and width < x < width + win_w:
                             found_kps.append(sorted_descriptors[idx])
-                    # TODO: From here on out I have no idea what's going on
+
                     matches = self.match_words(found_kps)
 
                     # Calculate a histogram of the word indices with the highest similarity scores
@@ -124,13 +124,15 @@ class Vocabulary:
 
                     # window_embedding = self.__embed_window(window, sorted_keypoints)
                     # Append the window embedding to the image embedding list
-                    img_embedding.append(window_embedding)
+                    # FIXME: Test
+                    # img_embedding.append(window_embedding)
+                    img_embedding.append(np.dot(window_embedding, centroids))
             # Flatten the image embedding list, convert it to a tensor,
             # and append it to the batched_embeddings list
             img_embedding = np.array(img_embedding)
             batched_embeddings.append(torch.flatten(torch.tensor(img_embedding)))
         # Stack the batched embeddings along the batch dimension and add singleton dimensions
-        return torch.stack(batched_embeddings).unsqueeze(1).unsqueeze(1)
+        return torch.stack(batched_embeddings).float()
 
 # mappe di presenza delle SIFT
 # dataset cartelli stradali
