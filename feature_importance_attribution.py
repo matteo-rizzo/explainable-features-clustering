@@ -2,10 +2,10 @@ import numpy as np
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
-from classes.clustering.KMeansClustering import KMeansClustering
+from classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
+from __to_delete.KMeansClustering import KMeansClustering
 from classes.data.MNISTDataset import MNISTDataset
-from classes.deep_learning.models.ModelImportanceWeightedCNN import ModelImportanceWeightedCNN
+from __to_delete.models.ModelImportanceWeightedCNN import ModelImportanceWeightedCNN
 from functional.torch_utils import get_device
 
 DEVICE_TYPE = "cpu"

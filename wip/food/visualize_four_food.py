@@ -4,7 +4,7 @@ import yaml
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
+from classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.data.Food101Dataset import Food101Dataset
 
 

@@ -4,8 +4,8 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from classes.factories.CriterionFactory import CriterionFactory
-from classes.factories.OptimizerFactory import OptimizerFactory
+from classes.deep_learning.factories.CriterionFactory import CriterionFactory
+from __to_delete.OptimizerFactory import OptimizerFactory
 
 
 class TrainableModel:

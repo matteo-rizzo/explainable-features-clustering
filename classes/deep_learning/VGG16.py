@@ -1,7 +1,7 @@
 import torch.nn as nn
 from torch import Tensor
 
-from classes.deep_learning.architectures.modules.common import Conv
+from classes.deep_learning.modules.common import Conv
 
 
 class VGG16(nn.Module):

@@ -1,12 +1,13 @@
 import numpy as np
+import torch
 import yaml
-from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 
-from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.clustering.Clusterer import Clusterer
 from classes.clustering.DimensionalityReducer import DimensionalityReducer
 from classes.data.Food101Dataset import Food101Dataset
+from classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
+from functional.data_utils import create_stratified_splits
 from functional.utils import default_logger
 
 
@@ -21,10 +22,18 @@ def main():
     # --- Logger ---
     logger = default_logger(generic_config["logger"])
     # --- Dataset ---
-    train_loader = DataLoader(Food101Dataset(train=False),
-                              batch_size=generic_config["batch_size"],
-                              shuffle=False,
-                              num_workers=generic_config["workers"])
+    train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=False),
+                                                         n_splits=1, train_size=505, test_size=101)
+    train_loader = torch.utils.data.DataLoader(train_subset,
+                                               batch_size=generic_config["batch_size"],
+                                               shuffle=True,
+                                               num_workers=generic_config["workers"],
+                                               drop_last=True)
+    test_loader = torch.utils.data.DataLoader(test_subset,
+                                              batch_size=generic_config["batch_size"],
+                                              shuffle=True,
+                                              num_workers=generic_config["workers"],
+                                              drop_last=True)
 
     # dataset = Food101Dataset(train=False)
     # indices = np.arange(len(dataset))
@@ -65,6 +74,11 @@ def main():
     labels = clusterer.fit_predict(flat_descriptors)
     clusterer.plot(vectors_2d, labels, "KMEANS")
     clusterer.plot_3d(vectors_3d, labels, "KMEANS")
+    # -- GMM Clustering ---
+    # clusterer = Clusterer(algorithm="GMM", logger=logger, **clustering_config["gmm_args"])
+    # labels = clusterer.fit_predict(flat_descriptors)
+    # clusterer.plot(vectors_2d, labels, "GMM")
+    # clusterer.plot_3d(vectors_3d, labels, "GMM")
 
 
 if __name__ == "__main__":

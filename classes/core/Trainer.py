@@ -15,8 +15,8 @@ from torch.utils.data import Dataset
 from torchmetrics import MetricCollection
 from tqdm.auto import tqdm
 
-from classes.factories.ActivationFactory import ActivationFactory
-from classes.factories.CriterionFactory import CriterionFactory
+from classes.deep_learning.factories.ActivationFactory import ActivationFactory
+from classes.deep_learning.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from functional.lr_schedulers import linear_lrs, one_cycle_lrs
 from functional.torch_utils import strip_optimizer, get_device
@@ -42,12 +42,13 @@ class Trainer:
                  hyperparameters: dict,
                  metric_collection: MetricCollection,
                  logger: logging.Logger = logging.getLogger(__name__)):
+        # --------------------------------------
         self.config: dict = config
         self.hyperparameters: dict = hyperparameters
         self.__logger: logging.Logger = logger
         self.__setup_logger()
         self.device: Optional[torch.device] = get_device(config["device"])
-        # --- Training stuff ---
+        # --- Training components ---
         self.optimizer: Optional[torch.optim.Optimizer] = None
         self.gradient_scaler: Optional[amp.GradScaler] = None
         # self.exponential_moving_average = None
@@ -55,14 +56,20 @@ class Trainer:
         self.scheduler: torch.optim.lr_scheduler = None  # Torch scheduler
         self.loss_fn: torch.nn.modules.loss = None  # Loss
         self.metrics: MetricCollection = metric_collection.to(self.device)  # Metrics
-        self.accumulate: int = -1
-        # ---
+        # --- Model ---
         self.model_class: Type[nn.Module] = model_class
         self.activation: nn.Module = ActivationFactory().get(self.config["inference"])
         self.model: Optional[nn.Module] = None
         self.checkpoint = None
+        # --- Flags ---
+        self.do_half = config["half_precision"]
+        # self.accumulate: int = -1
+        # , self.do_warmup, self.do_accumulation = (config["half_precision"],
+        #                                          config["warmup"], config["accumulate"])
+    # --------------------------------------
 
     def __setup_logger(self):
+        # --------------------------------------
         self.__logger.setLevel(self.config["logger"])
         ch = logging.StreamHandler()
         ch.setLevel(self.config["logger"])
@@ -72,6 +79,7 @@ class Trainer:
         )
         ch.setFormatter(formatter)
         self.__logger.addHandler(ch)
+        # --------------------------------------
 
     def train(self, train_dataloader: torch.utils.data.DataLoader,
               test_dataloader: torch.utils.data.DataLoader = None,
@@ -79,32 +87,27 @@ class Trainer:
         # --- Directories, initialize where things are saved ---
         self.__start_or_resume_config()
         save_dir, weights_dir, last_ckpt, best_ckpt, results_file = self.__init_dump_folder()
-
-        # --- Model ---
+        # ---Model ---
         locally_pretrained: bool = self.config["weights"].endswith('.pt')
-        self.__setup_model(locally_pretrained=locally_pretrained,
-                           **other_model_params)
+        self.__setup_model(locally_pretrained=locally_pretrained, **other_model_params)
         self.__print_model()
         # --- Gradient accumulation ---
-        # TODO: not enabled
-        # self.accumulate: int = self.__setup_gradient_accumulation()
-
+        # if self.do_accumulation:
+        #     self.accumulate: int = self.__setup_gradient_accumulation()
         # --- Optimization ---
         self.__setup_optimizer()
         self.__setup_criterion()
         # TODO: make optional / modularize
         self.__setup_scheduler()
-
         # --- Exponential moving average ---
         # self.exponential_moving_average = ExponentialMovingAverageModel(self.model)
-
         # --- Resume pretrained if necessary ---
         if locally_pretrained:
             start_epoch, best_fitness = self.__resume_pretrained(results_file=results_file)
             self.checkpoint = None
         else:
             start_epoch, best_fitness = 0, 0.0
-
+        # --------------------------------------
         results = (0,) * len(self.metrics)
         self.scheduler.last_epoch = start_epoch - 1  # do not move
         self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
@@ -119,22 +122,22 @@ class Trainer:
             f'{colorstr("bright_green", "Inference activation function")}: {self.config["inference"]}\n'
             f'{" " * 31}{colorstr("bright_green", "Starting training for")} '
             f'{self.config["epochs"]} epochs...')
-
-        # FIXME: frikcing cv2...
-        # torch.save(self.model, weights_dir / 'init.pt')
+        # --------------------------------------
+        torch.save(self.model, weights_dir / 'init.pt')
         epoch: int = -1
         t0 = time.time()
+        # ---------------------------------------------------------------------------------------
         # Start training ------------------------------------------------------------------------
         for epoch in range(start_epoch, self.config["epochs"]):
             # --- Forward, backward, optimization ---
             progress_description: str = self.__train_one_epoch(train_dataloader=train_dataloader, epoch=epoch)
-
             # --- Scheduler ---
             self.scheduler.step()
             # self.exponential_moving_average.update_attr(self.model, include=[.....])
             is_final_epoch: bool = epoch + 1 == self.config["epochs"]
             if (not self.config["notest"] or is_final_epoch) and test_dataloader:
-                self.test(train_dataloader, on_train=True)
+                if self.config["test_on_train"]:
+                    self.test(train_dataloader, on_train=True)
                 results = self.test(test_dataloader)
             if is_final_epoch and not test_dataloader:
                 self.__logger.info("Test dataset was not given: skipping test...")
@@ -142,26 +145,24 @@ class Trainer:
             with open(results_file, 'a') as ckpt:
                 ckpt.write(
                     progress_description + '%10.4g' * len(self.metrics) % tuple(results) + '\n')  # append metrics
-
-            # weighted combination of metrics
+            # Weighted combination of metrics (for now)
             fitness_value = fitness(np.array(results).reshape(1, -1))
             if fitness_value > best_fitness:
                 best_fitness = fitness_value
-
             # Save model
             if (not self.config["nosave"]) or is_final_epoch:
                 self.__save_model(best_fitness, epoch, fitness_value, best_ckpt, last_ckpt, results_file, weights_dir)
                 self.checkpoint = None
         # End training --------------------------------------------------------------------------
-
+        # ---------------------------------------------------------------------------------------
         self.__logger.info(f'{epoch - start_epoch + 1:g} epochs completed in {(time.time() - t0) / 3600:.3f} hours.\n')
-
         # --- Strip optimizers ---
         for ckpt in last_ckpt, best_ckpt:
             if ckpt.exists():
                 strip_optimizer(ckpt)
         torch.cuda.empty_cache()
         return results
+        # --------------------------------------
 
     def test(self, dataloader: torch.utils.data.DataLoader, on_train: bool = False):
         # --- Disable training ---
@@ -170,7 +171,7 @@ class Trainer:
         batch_number: int = len(dataloader)
         progress_bar = tqdm(enumerate(dataloader), total=batch_number, leave=True)
         rolling_metrics = [torch.tensor(0.0, device=self.device), ] * len(self.metrics)
-        # --------------------------------------------------
+        # --------------------------------------
         for idx, (inputs, targets) in progress_bar:
             inputs = inputs.to(self.device, non_blocking=True)
             targets = targets.to(self.device)
@@ -185,7 +186,7 @@ class Trainer:
                     batch_desc += f"{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
                                   f"{metric_value / (idx + 1):.3f}\t"
                 progress_bar.set_description(batch_desc)
-        # --------------------------------------------------
+        # --------------------------------------
         if not on_train:
             current_lr: float = self.optimizer.param_groups[0]['lr']
             epoch_desc = f"{colorstr('bold', 'white', '[Test Metrics]')} "
@@ -195,16 +196,12 @@ class Trainer:
             epoch_desc += (f"\t{colorstr('bold', 'white', '[Parameters]')} "
                            f"{colorstr('bold', 'yellow', 'Current lr')} : {current_lr:.3f} "
                            f"(-{self.optimizer.defaults['lr'] - current_lr:.3f})")
-            # --------------------------------------------------
+            # --------------------------------------
             self.__logger.info(epoch_desc)
             # self.__logger.info(f"{'-' * 100}")
             results = [m.cpu().item() / batch_number for m in rolling_metrics]
             return results
-
-
-    def __train_one_epoch_half_precision(self):
-        # TODO: to give a choice
-        pass
+        # --------------------------------------
 
     def __train_one_epoch(self, train_dataloader: torch.utils.data.DataLoader, epoch: int):
         # --- Enable training ---
@@ -213,30 +210,40 @@ class Trainer:
         epoch_description: str = ""
         batch_number: int = len(train_dataloader)
         progress_bar = tqdm(enumerate(train_dataloader), total=batch_number)
-        # Number of warmup iterations, max(config epochs (e.g., 3), 1k iterations)
-        # warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)
+        # Number of warmup iterations, max(config epochs (e.g., 3), 1k iterations)#
+        # if self.do_warmup:
+        #     warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)
         for idx, (inputs, targets) in progress_bar:
             # --- Zero gradient ---
             self.optimizer.zero_grad()
             # --- Warmup if enabled ---
-            # inputs, n_integrated_batches = self.__warmup_batch(inputs, batch_number, epoch, idx, warmup_number)
+            # if self.do_warmup:  # TODO: check how this operates on input
+            #     inputs, n_integrated_batches = self.__warmup_batch(inputs, batch_number, epoch, idx, warmup_number)
             # Autocast will cast to half precision the forward pass
-            with amp.autocast(enabled=self.device.type[:4] == "cuda"):
-                # --- Forward pass ---
+            if self.do_half:
+                with amp.autocast(enabled=self.device.type[:4] == "cuda"):
+                    # --- Forward pass ---
+                    preds = self.model(inputs.to(self.config["device"]))
+                    loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
+
+                # --- Backward (not recommended to be under autocast) ---
+                self.gradient_scaler.scale(loss).backward()
+                # --- Optimization (no warmup/accumulation)---
+                self.gradient_scaler.step(self.optimizer)
+                self.gradient_scaler.update()
+            else:
                 preds = self.model(inputs.to(self.config["device"]))
                 loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
-
-            # --- Backward (not recommended to be under autocast) ---
-            self.gradient_scaler.scale(loss).backward()
-            self.gradient_scaler.step(self.optimizer)
-            self.gradient_scaler.update()
-            # # --- Optimization ---
-            # if n_integrated_batches % self.accumulate == 0:
-            #     # Optimizer step and update
-            #     self.gradient_scaler.step(self.optimizer)
-            #     self.gradient_scaler.update()
-            #     # if self.exponential_moving_average:
-            #     #     self.exponential_moving_average.update(self.model)
+                loss.backward()
+                self.optimizer.step()
+            # --- Optimization (warmup/accumulation)---
+            # if self.do_warmup:
+            #     if n_integrated_batches % self.accumulate == 0:
+            #         # Optimizer step and update
+            #         self.gradient_scaler.step(self.optimizer)
+            #         self.gradient_scaler.update()
+            #         if self.exponential_moving_average:
+            #             self.exponential_moving_average.update(self.model)
 
             # --- Console logging ---
             mem: str = f'{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.2g}G'
@@ -248,34 +255,34 @@ class Trainer:
                  f"\t{colorstr('bold', 'magenta', f'{str(self.loss_fn)[:-2]}')}: {loss:.4f}"
                  )
             progress_bar.set_description(s)
-
         return epoch_description
+        # --------------------------------------
 
     def __calculate_loss(self, preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         # TODO: possibly add other parameters
         loss = self.loss_fn(preds, targets.to(self.config["device"]))
         return loss
 
-    def __warmup_batch(self, inputs: torch.Tensor, batch_number: int,
-                       epoch: int, i: int, warmup_number: int) -> [torch.Tensor, int]:
-
-        n_integrated_batches: int = i + batch_number * epoch  # number integrated batches (since train start)
-        inputs = inputs.to(self.device, non_blocking=True).float() / 255.0  # uint8 to float32, 0-255 to 0.0-1.0
-        if n_integrated_batches <= warmup_number:
-            x_interpolated = [0, warmup_number]
-            self.accumulate = max(1, np.interp(n_integrated_batches, x_interpolated,
-                                               [1, self.config["nominal_batch_size"]
-                                                / self.config["batch_size"]]).round())
-            for j, x in enumerate(self.optimizer.param_groups):
-                # bias lr falls from 0.1 to lr0, all other lrs rise from 0.0 to lr0
-                x['lr'] = np.interp(n_integrated_batches, x_interpolated,
-                                    [self.hyperparameters['warmup_bias_lr'] if j == 2 else 0.0,
-                                     x['initial_lr'] * self.lr_schedule_fn(epoch)])
-                if 'momentum' in x:
-                    x['momentum'] = np.interp(n_integrated_batches, x_interpolated,
-                                              [self.hyperparameters['warmup_momentum'],
-                                               self.hyperparameters['momentum']])
-        return inputs, n_integrated_batches
+    # def __warmup_batch(self, inputs: torch.Tensor, batch_number: int,
+    #                    epoch: int, i: int, warmup_number: int) -> [torch.Tensor, int]:
+    #
+    #     n_integrated_batches: int = i + batch_number * epoch  # number integrated batches (since train start)
+    #     inputs = inputs.to(self.device, non_blocking=True).float() / 255.0  # uint8 to float32, 0-255 to 0.0-1.0
+    #     if n_integrated_batches <= warmup_number:
+    #         x_interpolated = [0, warmup_number]
+    #         self.accumulate = max(1, np.interp(n_integrated_batches, x_interpolated,
+    #                                            [1, self.config["nominal_batch_size"]
+    #                                             / self.config["batch_size"]]).round())
+    #         for j, x in enumerate(self.optimizer.param_groups):
+    #             # bias lr falls from 0.1 to lr0, all other lrs rise from 0.0 to lr0
+    #             x['lr'] = np.interp(n_integrated_batches, x_interpolated,
+    #                                 [self.hyperparameters['warmup_bias_lr'] if j == 2 else 0.0,
+    #                                  x['initial_lr'] * self.lr_schedule_fn(epoch)])
+    #             if 'momentum' in x:
+    #                 x['momentum'] = np.interp(n_integrated_batches, x_interpolated,
+    #                                           [self.hyperparameters['warmup_momentum'],
+    #                                            self.hyperparameters['momentum']])
+    #     return inputs, n_integrated_batches
 
     def __start_or_resume_config(self) -> None:
         # --- Resume if a training had already started ---
@@ -344,15 +351,15 @@ class Trainer:
                                           logger=self.__logger,
                                           **other_model_params).to(self.device)
 
-    def __setup_gradient_accumulation(self) -> int:
-        # If the total batch size is less than or equal to the nominal batch size, then accumulate is set to 1.
-        # Accumulate losses before optimizing
-        accumulate = max(round(self.config["nominal_batch_size"] / self.config["batch_size"]), 1)
-        # Scale weight_decay
-        self.hyperparameters['weight_decay'] *= (self.config["batch_size"] * accumulate
-                                                 / self.config["nominal_batch_size"])
-        self.__logger.info(f"Scaled weight_decay = {self.hyperparameters['weight_decay']}")
-        return accumulate
+    # def __setup_gradient_accumulation(self) -> int:
+    #     # If the total batch size is less than or equal to the nominal batch size, then accumulate is set to 1.
+    #     # Accumulate losses before optimizing
+    #     accumulate = max(round(self.config["nominal_batch_size"] / self.config["batch_size"]), 1)
+    #     # Scale weight_decay
+    #     self.hyperparameters['weight_decay'] *= (self.config["batch_size"] * accumulate
+    #                                              / self.config["nominal_batch_size"])
+    #     self.__logger.info(f"Scaled weight_decay = {self.hyperparameters['weight_decay']}")
+    #     return accumulate
 
     def __setup_scheduler(self):
         if self.config["linear_lr"]:
@@ -368,17 +375,17 @@ class Trainer:
         match self.config["optimizer"]:
             case "SGD":
                 self.optimizer = torch.optim.SGD(self.model.parameters(),
-                                       lr=self.hyperparameters["lr0"],
-                                       momentum=self.hyperparameters['momentum'],
-                                       nesterov=self.hyperparameters['nesterov'])
+                                                 lr=self.hyperparameters["lr0"],
+                                                 momentum=self.hyperparameters['momentum'],
+                                                 nesterov=self.hyperparameters['nesterov'])
             case "Adam":
                 self.optimizer = torch.optim.Adam(self.model.parameters(),
-                                        lr=self.hyperparameters["lr0"],
-                                        betas=(self.hyperparameters['momentum'], 0.999))
+                                                  lr=self.hyperparameters["lr0"],
+                                                  betas=(self.hyperparameters['momentum'], 0.999))
             case "AdamW":
                 self.optimizer = torch.optim.AdamW(self.model.parameters(),
-                                         lr=self.hyperparameters["lr0"],
-                                         betas=(self.hyperparameters['momentum'], 0.999))
+                                                   lr=self.hyperparameters["lr0"],
+                                                   betas=(self.hyperparameters['momentum'], 0.999))
 
     def __setup_criterion(self):
         self.loss_fn = CriterionFactory().get(self.config["criterion"])

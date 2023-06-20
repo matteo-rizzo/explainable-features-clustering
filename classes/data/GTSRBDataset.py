@@ -5,13 +5,13 @@ import torchvision.transforms as T
 import yaml
 from matplotlib import pyplot as plt
 from torch.utils.data import Dataset
-from torchvision.datasets import Food101
+from torchvision.datasets import GTSRB
 from tqdm import tqdm
 
 from functional.data_utils import get_transform
 
 
-class Food101Dataset(Dataset):
+class GTSRBDataset(Dataset):
     def __init__(self, root: str = "dataset", train: bool = True, augment: bool = False):
         if augment:
             with open('config/datasets/augmentations_preset_1.yaml', 'r') as f:
@@ -19,16 +19,16 @@ class Food101Dataset(Dataset):
             transform = get_transform(transforms_config, img_size=224)
         else:
             transform = T.Compose([
-                T.Resize(224),
-                T.CenterCrop((224, 224)),
+                # T.Resize(224),
+                # T.CenterCrop((224, 224)),
                 T.ToTensor(),
                 # T.Normalize((0.5,), (0.5,)),
             ])
 
-        self.data = Food101(root=root,
-                            transform=transform,
-                            split="train" if train else "test",
-                            download=True)
+        self.data = GTSRB(root=root,
+                          transform=transform,
+                          split="train" if train else "test",
+                          download=True)
 
     def __getitem__(self, index):
         img, label = self.data[index]
@@ -39,7 +39,7 @@ class Food101Dataset(Dataset):
 
 
 def main():
-    dataloader = torch.utils.data.DataLoader(Food101Dataset(train=True, augment=True),
+    dataloader = torch.utils.data.DataLoader(GTSRBDataset(train=True, augment=False),
                                              batch_size=1,
                                              shuffle=True,
                                              num_workers=0,
@@ -49,7 +49,7 @@ def main():
     for (x, y) in tqdm(dataloader):
         print(x.shape, y)
         plt.imshow(x.squeeze(0).permute(1, 2, 0))
-        plt.text(0, -12, str(dataloader.dataset.data.classes[y.item()]), color='green', fontsize=14, ha='left',
+        plt.text(0, -12, str(y.item()), color='green', fontsize=14, ha='left',
                  va='top')
         plt.show()
         time.sleep(1.5)

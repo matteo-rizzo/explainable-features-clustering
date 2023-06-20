@@ -3,7 +3,7 @@ import numpy as np
 import yaml
 from torch.utils.data import DataLoader
 
-from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
+from classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.data.MNISTDataset import MNISTDataset
 
 

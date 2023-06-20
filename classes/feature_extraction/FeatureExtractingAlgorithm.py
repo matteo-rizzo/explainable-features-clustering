@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from classes.CornerExtractingAlgorithm import CornerExtractingAlgorithm
+from classes.feature_extraction.CornerExtractingAlgorithm import CornerExtractingAlgorithm
 from functional.utils import normalize_img
 from torch import Tensor
 

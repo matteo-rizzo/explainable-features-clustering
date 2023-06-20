@@ -1,4 +1,3 @@
-import logging
 import os
 from typing import Union, Dict, Tuple, List
 
@@ -7,8 +6,8 @@ import torch
 from torch import Tensor
 
 from classes.data.Vocabulary import Vocabulary
-from classes.deep_learning.architectures.ImportanceWeightedCNN import ImportanceWeightedCNN
-from classes.deep_learning.models.TrainableModel import TrainableModel
+from classes.deep_learning.ImportanceWeightedCNN import ImportanceWeightedCNN
+from __to_delete.models.TrainableModel import TrainableModel
 
 CONFIG_PATH = os.path.join("config", "architectures", "importance_weighted_cnn.yaml")
 

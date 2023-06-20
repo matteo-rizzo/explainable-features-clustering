@@ -7,22 +7,27 @@ num_channels: 11250
 device: "cuda:0" # Cuda device, i.e. 0 or 0,1,2,3 or cpu
 workers: 0 # Maximum number of dataloader workers
 batch_size: 40 # Total batch size for all GPUs
-nominal_batch_size: 40 # TODO: accumulation is disabled for now
+nominal_batch_size: 40 # ONLY IF ACCUMULATE TRUE
+
 epochs: 10 # Number of training epochs
 
-optimizer: "SGD" # [SGD ,Adam ,AdamW ]
+optimizer: "Adam" # [SGD ,Adam ,AdamW ]
 criterion: "CrossEntropyLoss" # [NLLLoss, CrossEntropyLoss]
 inference: "Softmax" # [Softmax, Sigmoid]
 linear_lr: False # linear learning rate (decay)
 
+# Flags
+half_precision: True
+# warmup: False
+# accumulate: False
+
 resume: False # Resume most recent training. True = latest, can be string to a specific checkpoint
 nosave: True # Only save final checkpoint
 notest: False # Only test final epoch
+test_on_train: True # Test metrics on train data
 logger: "INFO"
 
 # --- Configuration files and paths ---
-# TODO: remove, not very useful
-#data: "config/datasets/mnist.yaml" # data.yaml path [mnist, food101]
 architecture_config: "default"
 weights: "" # Initial weights path
 hyperparameters: "config/training/hypeparameter_configuration.yaml"  # Hyperparameters path

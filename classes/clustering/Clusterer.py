@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 
 from functional.utils import print_minutes, log_on_default
+from sklearn.mixture import GaussianMixture, BayesianGaussianMixture
 
 try:
     # Nvidia rapids / cuml gpu support
@@ -37,6 +38,8 @@ class Clusterer:
             self.__clusterer = AgglomerativeClustering(**kwargs)
         elif algorithm.upper() == "KMEANS":
             self.__clusterer = KMeans(**kwargs)
+        elif algorithm.upper() == "GMM":
+            self.__clusterer = GaussianMixture(**kwargs)
         else:
             raise ValueError("Invalid algorithm, must be in ['HDBSCAN', 'HAC', 'KMEANS']")
         pass

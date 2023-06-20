@@ -4,15 +4,11 @@ import torch
 import torchmetrics
 import yaml
 from torchmetrics import MetricCollection
-from tqdm import tqdm
 
 from classes.core.Trainer import Trainer
 from classes.data.Food101Dataset import Food101Dataset
-from classes.deep_learning.architectures.ConvNextWrapper import ConvNextWrapper
-from classes.factories.CriterionFactory import CriterionFactory
-from classes.factories.OptimizerFactory import OptimizerFactory
+from classes.deep_learning.ConvNextWrapper import ConvNextWrapper
 from functional.data_utils import create_stratified_splits
-from functional.torch_utils import get_device
 
 
 def main():

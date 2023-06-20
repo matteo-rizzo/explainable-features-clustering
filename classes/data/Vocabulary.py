@@ -1,12 +1,10 @@
 from typing import List, Tuple
 
-import cv2
 import numpy as np
 import torch
 from torch import Tensor
-from tqdm import tqdm
 
-from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
+from classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.clustering.Clusterer import Clusterer
 
 """

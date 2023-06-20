@@ -1,8 +1,7 @@
 import yaml
 from torch.utils.data import DataLoader
 
-from classes.CornerExtractingAlgorithm import CornerExtractingAlgorithm
-from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
+from classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.clustering.Clusterer import Clusterer
 from classes.clustering.DimensionalityReducer import DimensionalityReducer
 from classes.data.MNISTDataset import MNISTDataset

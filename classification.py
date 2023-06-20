@@ -7,13 +7,13 @@ import yaml
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
 
-from classes.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
+from classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from classes.clustering.Clusterer import Clusterer
 from classes.clustering.DimensionalityReducer import DimensionalityReducer
 from classes.core.Trainer import Trainer
 from classes.data.Food101Dataset import Food101Dataset
 from classes.data.Vocabulary import Vocabulary
-from classes.deep_learning.architectures.FeedForwardNet import FeedForwardNet
+from classes.deep_learning.FeedForwardNet import FeedForwardNet
 from functional.data_utils import create_stratified_splits
 
 PLOT = False
@@ -45,7 +45,7 @@ def main():
     #                                    drop_last=True)
 
     # TODO: Working on a subsample
-    train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True),
+    train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=False),
                                                          n_splits=1, train_size=505, test_size=101)
     train_loader = torch.utils.data.DataLoader(train_subset,
                                                batch_size=config["batch_size"],
@@ -137,13 +137,21 @@ def main():
     # # ----------------------------------------------------------------------
     # --- Metrics for training ---
     metric_collection = MetricCollection({
-        'accuracy': torchmetrics.Accuracy(task="multiclass", num_classes=10),
-        'precision': torchmetrics.Precision(task="multiclass", num_classes=10, average="macro"),
-        'recall': torchmetrics.Recall(task="multiclass", num_classes=10, average="macro"),
-        "F1": torchmetrics.F1Score(task="multiclass", num_classes=10, average="macro")
+        'accuracy': torchmetrics.Accuracy(task="multiclass",
+                                          num_classes=config["num_classes"]),
+        'precision': torchmetrics.Precision(task="multiclass",
+                                            num_classes=config["num_classes"],
+                                            average="macro"),
+        'recall': torchmetrics.Recall(task="multiclass",
+                                      num_classes=config["num_classes"],
+                                      average="macro"),
+        "F1": torchmetrics.F1Score(task="multiclass",
+                                   num_classes=config["num_classes"],
+                                   average="macro")
     })
     # # --- Training ---
-    trainer = Trainer(FeedForwardNet, config=config,
+    trainer = Trainer(FeedForwardNet,
+                      config=config,
                       hyperparameters=hyperparameters,
                       metric_collection=metric_collection,
                       logger=logger)
