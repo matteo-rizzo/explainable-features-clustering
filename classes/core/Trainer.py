@@ -128,7 +128,7 @@ class Trainer:
             f'{" " * 31}{colorstr("bright_green", "Starting training for")} '
             f'{self.config["epochs"]} epochs...')
         # --------------------------------------
-        # torch.save(self.model, weights_dir / 'init.pt')
+        torch.save(self.model, weights_dir / 'init.pt')
         epoch: int = -1
         t0 = time.time()
         # ---------------------------------------------------------------------------------------

@@ -3,9 +3,9 @@ from typing import List, Tuple
 import numpy as np
 import torch
 from torch import Tensor
-
-from classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
+import cv2
 from classes.clustering.Clusterer import Clusterer
+from classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 
 """
 Representing an image as matches of visual words over a sliding window is a common technique in computer vision and is
@@ -27,8 +27,8 @@ class Vocabulary:
         matches = []
         if not found_kps:
             histogram_edge: int = len(self.words) + 1
-            matches = np.full(histogram_edge, -1)
-            matches[-1] = histogram_edge  # Add 1 to "no keypoints" embedding
+            # matches = np.full(histogram_edge, -1)
+            matches = [histogram_edge]  # Add 1 to "no keypoints" embedding
             return matches
         else:
             for kp in found_kps:
@@ -36,12 +36,12 @@ class Vocabulary:
                 a = self.clusterer.predict(np.expand_dims(kp, 0))
                 matches.append(int(a))
             # for kp in found_kps:
-                # word_match = []
-                # for word_index, word in enumerate(self.words):
-                #     self.words
-                    # res = cv2.matchTemplate(word, kp, cv2.TM_CCOEFF_NORMED)
-                    # word_match.append(-1 if res[0][0] < threshold else word_index)
-                # matches.append(word_match)
+            # word_match = []
+            # for word_index, word in enumerate(self.words):
+            #     self.words
+            # res = cv2.matchTemplate(word, kp, cv2.TM_CCOEFF_NORMED)
+            # word_match.append(-1 if res[0][0] < threshold else word_index)
+            # matches.append(word_match)
 
             # matches = np.where(matches >= threshold)
             return matches
@@ -71,7 +71,37 @@ class Vocabulary:
     #     # Return the histogram as the final embedding for the window
     #     return hist
 
-    def embed(self, images: Tensor, window_size: Tuple = (28, 28), stride: int = 28) -> Tensor:
+    def embed(self, keypoints: tuple[cv2.KeyPoint], descriptors: np.ndarray,
+              image_size: tuple = (224, 224),
+              window_size: tuple = (28, 28),
+              stride: int = 28):
+        centroids = self.clusterer.get_centroids()
+        (win_w, win_h) = window_size
+        img_width, img_height = image_size
+        img_embedding = []
+        for height in range(0, img_height - win_h + 1, stride):
+            for width in range(0, img_width - win_w + 1, stride):
+                found_kps = []
+                # Embed the window
+                for idx, kp in enumerate(keypoints):
+                    x, y = kp.pt
+                    if height < y < height + win_w and width < x < width + win_w:
+                        found_kps.append(descriptors[idx])
+
+                matches = self.match_words(found_kps)
+                window_embedding, _ = np.histogram(matches, bins=range(len(self.words) + 1))
+                # FIXME: test
+                # img_embedding.append(window_embedding)
+                img_embedding.append(np.multiply(np.expand_dims(window_embedding, 1), centroids))
+
+        # shape: number of windows (e.g. 224 with stride 24 = 64), number of words, 128 (SIFT)
+        img_embedding = np.array(img_embedding)
+        # FIXME: experimental
+        img_embedding = np.vstack(img_embedding)
+        # return torch.flatten(torch.tensor(img_embedding)).float()
+        return torch.tensor(img_embedding).float()
+
+    def __embed(self, images: Tensor, window_size: Tuple = (28, 28), stride: int = 28) -> Tensor:
         # TODO: try fractional stride
         # Initialize an empty list to store embeddings for each image in the batch
         batched_embeddings, (win_w, win_h) = [], window_size

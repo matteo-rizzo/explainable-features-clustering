@@ -23,7 +23,7 @@ def strip_optimizer(ckpt_path: Path = Path('best.pt'), desc: str = ''):
     print(f"Optimizer stripped from {ckpt_path},{(' saved as %s,' % desc) if desc else ''} {mb:.1f}MB")
 
 
-def set_random_seed(seed: int, device: torch.device):
+def set_random_seed(seed: int, device: str):
     """
     Set specific seed for reproducibility.
 
@@ -32,7 +32,7 @@ def set_random_seed(seed: int, device: torch.device):
     :return:
     """
     torch.manual_seed(seed)
-    if device.type == 'cuda:3':
+    if device[:4] == 'cuda':
         torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     random.seed(seed)
