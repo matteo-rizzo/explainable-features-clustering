@@ -27,50 +27,13 @@ class Vocabulary:
         matches = []
         if not found_kps:
             histogram_edge: int = len(self.words) + 1
-            # matches = np.full(histogram_edge, -1)
             matches = [histogram_edge]  # Add 1 to "no keypoints" embedding
             return matches
         else:
             for kp in found_kps:
-                # a = self.clusterer.predict(kp)
                 a = self.clusterer.predict(np.expand_dims(kp, 0))
                 matches.append(int(a))
-            # for kp in found_kps:
-            # word_match = []
-            # for word_index, word in enumerate(self.words):
-            #     self.words
-            # res = cv2.matchTemplate(word, kp, cv2.TM_CCOEFF_NORMED)
-            # word_match.append(-1 if res[0][0] < threshold else word_index)
-            # matches.append(word_match)
-
-            # matches = np.where(matches >= threshold)
             return matches
-
-    # def __embed_window(self, window: np.ndarray, sorted_keypoints) -> np.ndarray:
-    #     present_kps = []
-    #     for kp in sorted_keypoints:
-    #         coords = kp.pt
-    #     # Check if the window is empty (contains only zeros)
-    #     if not np.any(window != 0):
-    #         # Return an embedding array filled with -1 values
-    #         return np.full((len(self.__words),), -1)
-    #
-    #     # Run feature extraction on the window
-    #     _, desc = self.__feature_extractor.run(window)
-    #     # If feature extraction failed or didn't produce a valid descriptor,
-    #     # return an embedding array filled with -1 values
-    #     if desc is None:
-    #         return np.full((len(self.__words),), -1)
-    #
-    #     # Match the descriptor with predefined words to get similarity scores or matching results
-    #     matches = self.match_words(desc)
-    #
-    #     # Calculate a histogram of the word indices with the highest similarity scores
-    #     hist, _ = np.histogram(np.argmax(matches, axis=1), bins=range(len(self.__words) + 1))
-    #
-    #     # Return the histogram as the final embedding for the window
-    #     return hist
-
     def embed(self, keypoints: tuple[cv2.KeyPoint], descriptors: np.ndarray,
               image_size: tuple = (224, 224),
               window_size: tuple = (56, 56),
@@ -91,8 +54,8 @@ class Vocabulary:
                 matches = self.match_words(found_kps)
                 window_embedding, _ = np.histogram(matches, bins=range(len(self.words) + 1))
                 # FIXME: test
-                # img_embedding.append(window_embedding)
-                img_embedding.append(np.multiply(np.expand_dims(window_embedding, 1), centroids))
+                img_embedding.append(window_embedding.astype(float))
+                # img_embedding.append(np.multiply(np.expand_dims(window_embedding, 1), centroids))
 
         # shape: number of windows (e.g. 224 with stride 24 = 64), number of words, 128 (SIFT)
         img_embedding = np.array(img_embedding)
