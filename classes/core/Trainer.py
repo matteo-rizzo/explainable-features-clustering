@@ -388,6 +388,10 @@ class Trainer:
                 self.optimizer = torch.optim.Adam(self.model.parameters(),
                                                   lr=self.hyperparameters["lr0"],
                                                   betas=(self.hyperparameters['momentum'], 0.999))
+            case "SparseAdam":
+                self.optimizer = torch.optim.SparseAdam(self.model.parameters(),
+                                                        lr=self.hyperparameters["lr0"],
+                                                        betas=(self.hyperparameters['momentum'], 0.999))
             case "AdamW":
                 self.optimizer = torch.optim.AdamW(self.model.parameters(),
                                                    lr=self.hyperparameters["lr0"],

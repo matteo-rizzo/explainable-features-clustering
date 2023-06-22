@@ -13,7 +13,7 @@ class FeedForwardNet(nn.Module):
                                      config["num_classes"])
 
         hidden_size: int = 2000
-
+        # TODO: perhaps I should use an embedding layer?!
         self.fc1 = nn.Linear(num_channels, hidden_size)
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(hidden_size, hidden_size*2)
