@@ -9,7 +9,7 @@ from torchmetrics import MetricCollection
 
 from classes.clustering.Clusterer import Clusterer
 from classes.core.Trainer import Trainer
-from classes.data.KeypointDataset import KeypointDataset
+from classes.data.KeypointPetDataset import KeypointPetDataset
 from classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from classes.data.Vocabulary import Vocabulary
 from classes.deep_learning.FeedForwardNet import FeedForwardNet
@@ -39,12 +39,12 @@ def main():
                                                batch_size=config["batch_size"],
                                                shuffle=True,
                                                num_workers=config["workers"],
-                                               drop_last=True)
+                                               drop_last=False)
     test_loader = torch.utils.data.DataLoader(OxfordIIITPetDataset(train=False, augment=False),
                                               batch_size=config["batch_size"],
                                               shuffle=True,
                                               num_workers=config["workers"],
-                                              drop_last=True)
+                                              drop_last=False)
     # --- Feature extraction ---
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
 
@@ -64,21 +64,21 @@ def main():
     # TODO: just to be sure
     set_random_seed(42, config["device"])
     train_kp_loader = torch.utils.data.DataLoader(
-        KeypointDataset(keypoints=train_keypoints,
-                        descriptors=train_descriptors,
-                        vocab=vocab, train=True),
+        KeypointPetDataset(keypoints=train_keypoints,
+                           descriptors=train_descriptors,
+                           vocab=vocab, train=True),
         batch_size=config["batch_size"],
         shuffle=True,
         num_workers=config["workers"],
         drop_last=True)
 
-    for data in train_kp_loader:
-        print(data)
+    # for data in train_kp_loader:
+    #     print(data)
 
     test_kp_loader = torch.utils.data.DataLoader(
-        KeypointDataset(keypoints=test_keypoints,
-                        descriptors=test_descriptors,
-                        vocab=vocab, train=False),
+        KeypointPetDataset(keypoints=test_keypoints,
+                           descriptors=test_descriptors,
+                           vocab=vocab, train=False),
         batch_size=config["batch_size"],
         shuffle=True,
         num_workers=config["workers"],

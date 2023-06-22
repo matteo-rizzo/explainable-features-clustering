@@ -6,7 +6,7 @@ from torchvision.datasets import OxfordIIITPet
 from classes.data.Vocabulary import Vocabulary
 
 
-class KeypointDataset(Dataset):
+class KeypointPetDataset(Dataset):
     def __init__(self, keypoints: list, descriptors: list, vocab: Vocabulary,
                  root: str = "dataset", train: bool = True,
                  ):

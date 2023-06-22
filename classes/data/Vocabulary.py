@@ -73,8 +73,8 @@ class Vocabulary:
 
     def embed(self, keypoints: tuple[cv2.KeyPoint], descriptors: np.ndarray,
               image_size: tuple = (224, 224),
-              window_size: tuple = (28, 28),
-              stride: int = 28):
+              window_size: tuple = (56, 56),
+              stride: int = 56):
         centroids = self.clusterer.get_centroids()
         (win_w, win_h) = window_size
         img_width, img_height = image_size
@@ -97,11 +97,11 @@ class Vocabulary:
         # shape: number of windows (e.g. 224 with stride 24 = 64), number of words, 128 (SIFT)
         img_embedding = np.array(img_embedding)
         # FIXME: experimental
-        img_embedding = np.vstack(img_embedding)
-        # return torch.flatten(torch.tensor(img_embedding)).float()
-        return torch.tensor(img_embedding).float()
+        # img_embedding = np.vstack(img_embedding)
+        return torch.flatten(torch.tensor(img_embedding)).float()
+        # return torch.tensor(img_embedding).float()
 
-    def __embed(self, images: Tensor, window_size: Tuple = (28, 28), stride: int = 28) -> Tensor:
+    def __embed(self, images: Tensor, window_size: Tuple = (56, 56), stride: int = 56) -> Tensor:
         # TODO: try fractional stride
         # Initialize an empty list to store embeddings for each image in the batch
         batched_embeddings, (win_w, win_h) = [], window_size
