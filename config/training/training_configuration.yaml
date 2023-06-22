@@ -9,7 +9,7 @@ workers: 0 # Maximum number of dataloader workers
 batch_size: 30 # Total batch size for all GPUs
 #nominal_batch_size: 20 # ONLY IF ACCUMULATE TRUE
 
-epochs: 10 # Number of training epochs
+epochs: 1 # Number of training epochs
 
 optimizer: "Adam" # [SGD ,Adam ,AdamW, SparseAdam]
 criterion: "CrossEntropyLoss" # [NLLLoss, CrossEntropyLoss]
