@@ -1,9 +1,10 @@
 from typing import List, Tuple
 
+import cv2
 import numpy as np
 import torch
 from torch import Tensor
-import cv2
+
 from classes.clustering.Clusterer import Clusterer
 from classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 
@@ -34,6 +35,14 @@ class Vocabulary:
                 a = self.clusterer.predict(np.expand_dims(kp, 0))
                 matches.append(int(a))
             return matches
+
+    def embed_unordered(self, descriptors):
+        histogram = np.zeros(len(self.clusterer.get_centroids()))
+        cluster_result = self.clusterer.predict(descriptors)
+        for i in cluster_result:
+            histogram[i] += 1.0
+        return torch.tensor(histogram).float()
+
     def embed(self, keypoints: tuple[cv2.KeyPoint], descriptors: np.ndarray,
               image_size: tuple = (224, 224),
               window_size: tuple = (56, 56),
@@ -85,7 +94,7 @@ class Vocabulary:
 
             # sorted_keypoints = sorted(keypoints, key=lambda kp: (kp.pt[1], kp.pt[0]))
             centroids = self.clusterer.get_centroids()
-            keypoints, descriptors = self.feature_extractor.get_keypoints_and_descriptors(img, rgb=True)
+            keypoints, descriptors = self.feature_extractor.get_keypoints_and_descriptors(img)
             # Sort keypoints and descriptors together based on y-axis first and x-axis second
             sorted_data = sorted(zip(keypoints, descriptors), key=lambda data: (data[0].pt[1], data[0].pt[0]))
             # Unzip the sorted data back into separate keypoints and descriptors lists

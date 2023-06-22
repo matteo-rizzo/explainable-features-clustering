@@ -48,8 +48,8 @@ def main():
     # --- Feature extraction ---
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
 
-    train_keypoints, train_descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader, rgb=True)
-    test_keypoints, test_descriptors = key_points_extractor.get_keypoints_and_descriptors(test_loader, rgb=True)
+    train_keypoints, train_descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
+    test_keypoints, test_descriptors = key_points_extractor.get_keypoints_and_descriptors(test_loader)
     # Gather all descriptors in a single big array
     flat_train_descriptors = np.concatenate(train_descriptors)
     # --- Clustering ---

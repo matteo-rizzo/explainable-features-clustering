@@ -61,7 +61,8 @@ def show_4():
     # for imgs, _ in train_loader:
     for imgs, _ in train_loader:
         for img in imgs:
-            img = (img.numpy().squeeze() * 255).astype(np.uint8).transpose((1, 2, 0))
+            # img = (img.numpy().squeeze() * 255).astype(np.uint8).transpose((1, 2, 0))
+            img = (img.numpy().squeeze() * 255).astype(np.uint8)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
             kp1, _ = key_points_extractor_1.run(img)

@@ -17,9 +17,12 @@ class KeypointPetDataset(Dataset):
         self.descriptors: list[np.ndarray] = descriptors
         self.vocab: Vocabulary = vocab
 
-    def __getitem__(self, index):
+
+
+    def __getitem__(self, index: int):
         _, label = self.data[index]
-        img = self.vocab.embed(self.keypoints[index], self.descriptors[index])
+        # img = self.vocab.embed(self.keypoints[index], self.descriptors[index])
+        img = self.vocab.embed_unordered(self.descriptors[index])
         return img, label
 
     def __len__(self):

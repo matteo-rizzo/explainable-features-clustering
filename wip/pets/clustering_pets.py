@@ -50,7 +50,7 @@ def main():
     # -----------------------------------------------------------------------------------
     # --- Keypoint extraction and feature description ---
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", nfeatures=400, logger=logger)
-    keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader, rgb=True)
+    keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
     flat_descriptors = np.concatenate(descriptors)
     # -- Reduction ---
     dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", logger=logger, **clustering_config["umap_args_2d"])
@@ -79,5 +79,49 @@ def main():
     # clusterer.plot_3d(vectors_3d, labels, "GMM")
 
 
+def main2():
+    # --- Config ---
+    with open('config/training/training_configuration.yaml', 'r') as f:
+        generic_config: dict = yaml.safe_load(f)
+    with open('config/clustering/clustering_params.yaml', 'r') as f:
+        clustering_config: dict = yaml.safe_load(f)
+    # --- Logger ---
+    logger = default_logger(generic_config["logger"])
+    # --- Dataset ---
+    train_loader = torch.utils.data.DataLoader(OxfordIIITPetDataset(train=True, augment=False),
+                                               batch_size=generic_config["batch_size"],
+                                               shuffle=True,
+                                               num_workers=generic_config["workers"],
+                                               drop_last=False)
+    # -----------------------------------------------------------------------------------
+    # --- Keypoint extraction and feature description ---
+    key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", nfeatures=400, logger=logger)
+    keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
+    flat_descriptors = np.concatenate(descriptors)
+    # -- Reduction ---
+    dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", logger=logger,
+                                                   **clustering_config["umap_args_2d"])
+    vectors_2d = dimensionality_reducer.fit_transform(flat_descriptors)
+    # -- KMEANS Clustering --
+    clusterer = Clusterer(algorithm="KMEANS", logger=logger, **clustering_config["kmeans_args"])
+    labels = clusterer.fit_predict(flat_descriptors)
+    clusterer.plot(vectors_2d, labels, "KMEANS")
+
+    preprocessed_image = []
+    for image, label in train_loader:
+        # image = gray(image)
+        keypoint, descriptor = key_points_extractor.get_keypoints_and_descriptors(image)
+        if descriptor is not None:
+            histogram = build_histogram(descriptor, clusterer.clusterer)
+            preprocessed_image.append(histogram)
+    print(preprocessed_image)
+
+def build_histogram(descriptor_list, cluster_alg):
+    histogram = np.zeros(len(cluster_alg.cluster_centers_))
+    cluster_result =  cluster_alg.predict(descriptor_list)
+    for i in cluster_result:
+        histogram[i] += 1.0
+    return histogram
+
 if __name__ == "__main__":
-    main()
+    main2()

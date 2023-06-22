@@ -30,16 +30,16 @@ class Clusterer:
         self.__algorithm_name: str = algorithm
         self.__logger = logger
         if algorithm.upper() == "HDBSCAN":
-            self.__clusterer = HDBSCAN(**kwargs)
+            self.clusterer = HDBSCAN(**kwargs)
         elif algorithm.upper() == "HAC":
             # In cuml, metric is called affinity (in sklearn it has been changed to metric)
             if DEVICE == "GPU":
                 kwargs["affinity"] = kwargs.pop("metric")
-            self.__clusterer = AgglomerativeClustering(**kwargs)
+            self.clusterer = AgglomerativeClustering(**kwargs)
         elif algorithm.upper() == "KMEANS":
-            self.__clusterer = KMeans(**kwargs)
+            self.clusterer = KMeans(**kwargs)
         elif algorithm.upper() == "GMM":
-            self.__clusterer = GaussianMixture(**kwargs)
+            self.clusterer = GaussianMixture(**kwargs)
         else:
             raise ValueError("Invalid algorithm, must be in ['HDBSCAN', 'HAC', 'KMEANS']")
         pass
@@ -47,28 +47,28 @@ class Clusterer:
     def fit_predict(self, vectors: np.ndarray) -> np.ndarray:
         t0 = time.perf_counter()
         self.__logger.info(f"Running {self.__algorithm_name} fit_predict...")
-        cluster_labels = self.__clusterer.fit_predict(vectors)
+        cluster_labels = self.clusterer.fit_predict(vectors)
         print_minutes(seconds=(time.perf_counter() - t0), input_str=self.__algorithm_name, logger=self.__logger)
         return cluster_labels
 
     def fit(self, vectors: np.ndarray) -> None:
         t0 = time.perf_counter()
         self.__logger.info(f"Running {self.__algorithm_name} fit...")
-        self.__clusterer.fit(vectors)
+        self.clusterer.fit(vectors)
         print_minutes(seconds=(time.perf_counter() - t0), input_str=self.__algorithm_name, logger=self.__logger)
 
     def predict(self, vector: np.ndarray):
-        return self.__clusterer.predict(vector)
+        return self.clusterer.predict(vector)
 
     def score(self, vectors: np.ndarray) -> float:
-        return self.__clusterer.score(vectors)
+        return self.clusterer.score(vectors)
 
     def get_estimator(self):
-        return self.__clusterer
+        return self.clusterer
 
     def get_centroids(self):
         # FIXME: add "if it exists" (density based don't have it)
-        return self.__clusterer.cluster_centers_
+        return self.clusterer.cluster_centers_
 
     @staticmethod
     def rank_clusters(data: np.ndarray, centroids: np.ndarray, labels: list | np.ndarray, print_values: bool = False) -> \

@@ -52,7 +52,7 @@ def main():
     # -----------------------------------------------------------------------------------
     # --- Keypoint extraction and feature description ---
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", nfeatures=400, logger=logger)
-    keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader, rgb=True)
+    keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
     flat_descriptors = np.concatenate(descriptors)
     # -- Reduction ---
     dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", logger=logger, **clustering_config["umap_args_2d"])
@@ -80,6 +80,39 @@ def main():
     # clusterer.plot(vectors_2d, labels, "GMM")
     # clusterer.plot_3d(vectors_3d, labels, "GMM")
 
+
+def new_clustering():
+    def main():
+        # --- Config ---
+        with open('config/training/training_configuration.yaml', 'r') as f:
+            generic_config: dict = yaml.safe_load(f)
+        with open('config/clustering/clustering_params.yaml', 'r') as f:
+            clustering_config: dict = yaml.safe_load(f)
+        # --- Logger ---
+        logger = default_logger(generic_config["logger"])
+        # --- Dataset ---
+        train_subset, test_subset = create_stratified_splits(Food101Dataset(train=True, augment=False),
+                                                             n_splits=1, train_size=505, test_size=101)
+        train_loader = torch.utils.data.DataLoader(train_subset,
+                                                   batch_size=generic_config["batch_size"],
+                                                   shuffle=True,
+                                                   num_workers=generic_config["workers"],
+                                                   drop_last=True)
+        # -----------------------------------------------------------------------------------
+        # --- Keypoint extraction and feature description ---
+        key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", nfeatures=400, logger=logger)
+        keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
+        flat_descriptors = np.concatenate(descriptors)
+        # -- Reduction ---
+        dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", logger=logger,
+                                                       **clustering_config["umap_args_2d"])
+        vectors_2d = dimensionality_reducer.fit_transform(flat_descriptors)
+        dimensionality_reducer = DimensionalityReducer(algorithm="UMAP", logger=logger,
+                                                       **clustering_config["umap_args_3d"])
+        # -- KMEANS Clustering --
+        clusterer = Clusterer(algorithm="KMEANS", logger=logger, **clustering_config["kmeans_args"])
+        labels = clusterer.fit_predict(flat_descriptors)
+        clusterer.plot(vectors_2d, labels, "KMEANS")
 
 if __name__ == "__main__":
     main()

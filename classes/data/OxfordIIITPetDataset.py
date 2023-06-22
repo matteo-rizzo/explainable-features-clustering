@@ -21,6 +21,7 @@ class OxfordIIITPetDataset(Dataset):
             transform = T.Compose([
                 T.Resize(224),
                 T.CenterCrop((224, 224)),
+                T.Grayscale(),
                 T.ToTensor(),
                 # T.Normalize((0.5,), (0.5,)),
             ])

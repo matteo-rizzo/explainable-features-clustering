@@ -83,7 +83,7 @@ class FeatureExtractingAlgorithm:
         plt.show()
         plt.clf()
 
-    def get_keypoints_and_descriptors(self, data: DataLoader | Tensor, rgb: bool = False) \
+    def get_keypoints_and_descriptors(self, data: DataLoader | Tensor) \
             -> Tuple[List, List] | Tuple[Tuple, Optional[np.ndarray]]:
         descriptors, keypoints = [], []
         # ----------------------------------------------
@@ -91,8 +91,9 @@ class FeatureExtractingAlgorithm:
             for (images, _) in tqdm(data, desc=f"Generating keypoints and descriptors using {self.__algorithm_name}"):
                 for i in range(images.shape[0]):
                     img = normalize_img(images[i]).squeeze()
-                    if rgb:
-                        img = cv2.cvtColor(img.transpose((1, 2, 0)), cv2.COLOR_RGB2BGR)
+                    # NOTE: no, we're making them gray now
+                    # if rgb:
+                    #     img = cv2.cvtColor(img.transpose((1, 2, 0)), cv2.COLOR_RGB2BGR)
                     img_keypoints, img_descriptors = self.run(img)
                     if img_descriptors is not None:
                         keypoints.append(img_keypoints)
