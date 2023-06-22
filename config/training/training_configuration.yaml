@@ -11,7 +11,7 @@ batch_size: 30 # Total batch size for all GPUs
 
 epochs: 10 # Number of training epochs
 
-optimizer: "SparseAdam" # [SGD ,Adam ,AdamW, SparseAdam]
+optimizer: "Adam" # [SGD ,Adam ,AdamW, SparseAdam]
 criterion: "CrossEntropyLoss" # [NLLLoss, CrossEntropyLoss]
 inference: "Softmax" # [Softmax, Sigmoid]
 linear_lr: False # linear learning rate (decay)
