@@ -9,7 +9,7 @@ import numpy as np
 from torch import Tensor
 
 
-def normalize_img(img: Tensor) -> np.ndarray:
+def rescale_img(img: Tensor) -> np.ndarray:
     return (img.cpu().numpy() * 255).astype(np.uint8)
 
 

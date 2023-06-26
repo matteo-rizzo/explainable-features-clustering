@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from classes.feature_extraction.CornerExtractingAlgorithm import CornerExtractingAlgorithm
-from functional.utils import normalize_img
+from functional.utils import rescale_img
 from torch import Tensor
 
 class FeatureExtractingAlgorithm:
@@ -90,7 +90,7 @@ class FeatureExtractingAlgorithm:
         if isinstance(data, DataLoader):
             for (images, _) in tqdm(data, desc=f"Generating keypoints and descriptors using {self.__algorithm_name}"):
                 for i in range(images.shape[0]):
-                    img = normalize_img(images[i]).squeeze()
+                    img = rescale_img(images[i]).squeeze()
                     # NOTE: no, we're making them gray now
                     # if rgb:
                     #     img = cv2.cvtColor(img.transpose((1, 2, 0)), cv2.COLOR_RGB2BGR)
@@ -102,9 +102,9 @@ class FeatureExtractingAlgorithm:
         # ----------------------------------------------
         # Single image
         elif isinstance(data, Tensor):
-            img = normalize_img(data).squeeze()
-            if rgb:
-                img = cv2.cvtColor(img.transpose((1, 2, 0)), cv2.COLOR_RGB2BGR)
+            img = rescale_img(data).squeeze()
+            # if rgb:
+            #     img = cv2.cvtColor(img.transpose((1, 2, 0)), cv2.COLOR_RGB2BGR)
             return self.run(img)
         # ----------------------------------------------
         else:
