@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from classes.deep_learning.factories.CriterionFactory import CriterionFactory
+from src.classes.deep_learning.factories.CriterionFactory import CriterionFactory
 from __to_delete.OptimizerFactory import OptimizerFactory
 
 

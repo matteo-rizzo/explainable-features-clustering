@@ -5,8 +5,8 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from classes.data.Vocabulary import Vocabulary
-from classes.deep_learning.ImportanceWeightedCNN import ImportanceWeightedCNN
+from src.classes.data.Vocabulary import Vocabulary
+from src.classes.deep_learning.ImportanceWeightedCNN import ImportanceWeightedCNN
 from __to_delete.models.TrainableModel import TrainableModel
 
 CONFIG_PATH = os.path.join("config", "architectures", "importance_weighted_cnn.yaml")

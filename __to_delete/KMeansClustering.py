@@ -10,8 +10,8 @@ from sklearn.metrics import silhouette_score
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
-from classes.data.MNISTDataset import MNISTDataset
+from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
+from src.classes.data.MNISTDataset import MNISTDataset
 
 
 class KMeansClustering:
