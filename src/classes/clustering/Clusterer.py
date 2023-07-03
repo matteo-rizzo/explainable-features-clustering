@@ -8,7 +8,6 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 
 from src.functional.utils import print_minutes, log_on_default
-from sklearn.mixture import GaussianMixture
 
 try:
     # Nvidia rapids / cuml gpu support
@@ -38,27 +37,32 @@ class Clusterer:
             self.clusterer = AgglomerativeClustering(**kwargs)
         elif algorithm.upper() == "KMEANS":
             self.clusterer = KMeans(**kwargs)
-        elif algorithm.upper() == "GMM":
-            self.clusterer = GaussianMixture(**kwargs)
+        # elif algorithm.upper() == "GMM":
+        #     self.clusterer = GaussianMixture(**kwargs)
         else:
             raise ValueError("Invalid algorithm, must be in ['HDBSCAN', 'HAC', 'KMEANS']")
         pass
 
     def fit_predict(self, vectors: np.ndarray) -> np.ndarray:
         t0 = time.perf_counter()
-        self.__logger.info(f"Running {self.__algorithm_name} fit_predict...")
+        self.__logger.info(f"Running {self.__algorithm_name} fit_predict [k = {self.clusterer.n_clusters}]...")
         cluster_labels = self.clusterer.fit_predict(vectors)
         print_minutes(seconds=(time.perf_counter() - t0), input_str=self.__algorithm_name, logger=self.__logger)
         return cluster_labels
 
     def fit(self, vectors: np.ndarray) -> None:
         t0 = time.perf_counter()
-        self.__logger.info(f"Running {self.__algorithm_name} fit...")
+        self.__logger.info(f"Running {self.__algorithm_name} fit [k = {self.clusterer.n_clusters}]...")
         self.clusterer.fit(vectors)
         print_minutes(seconds=(time.perf_counter() - t0), input_str=self.__algorithm_name, logger=self.__logger)
 
     def predict(self, vector: np.ndarray):
-        return self.clusterer.predict(vector)
+        match self.__algorithm_name:
+            case "HDBSCAN":
+                return self.clusterer.approximate_predict(self.clusterer, vector)
+            # Case default
+            case _:
+                return self.clusterer.predict(vector)
 
     def score(self, vectors: np.ndarray) -> float:
         return self.clusterer.score(vectors)
@@ -98,6 +102,9 @@ class Clusterer:
                 print(f"[{i}] Cluster {ranking[0]}: Importance Score = {ranking[1]}")
 
         return clusters_ranking
+
+    def n_clusters(self):
+        return self.clusterer.n_clusters
 
     @staticmethod
     def plot(vectors, labels, name: str = "", save: bool = False):

@@ -83,7 +83,7 @@ def extract_patch(img, keypoint, patch_size: int = 32, min_patch_size: int = 16)
     keypoint_size = keypoint.size
 
     # Adjust the patch size based on the keypoint size
-    patch_size = int(max(keypoint_size * 2, min_patch_size))
+    # patch_size = int(max(keypoint_size * 2, min_patch_size))
 
     top = max(y - patch_size // 2, 0)
     bottom = min(y + patch_size // 2, img.shape[0])
@@ -161,38 +161,9 @@ def plot_cluster_sift_patches():
                              img_keypoints,
                              img_descriptors_clusters,
                              cluster_patches)
-        # print(img)
-    # random_integers = np.random.randint(0, clustering_config["kmeans_args"]["n_clusters"] + 1, size=10)
+
     for i in tqdm(range(clustering_config["kmeans_args"]["n_clusters"]), desc="Saving plots"):
         plot_patches(cluster_patches[i], i)
-        # plot_patches(cluster_patches[5], 5)
-        # plot_patches(cluster_patches[12], 12)
-        # plot_patches(cluster_patches[222], 222)
-        # plot_patches(cluster_patches[3], 3)
-        # plot_patches(cluster_patches[30], 30)
-    # Go through images
-    # Find descriptors
-    # Predict the cluster they belong to (?)
-    # Extract patches
-    # Add them to a list
-    # Plot clusters made this way
-
-    # preprocessed_image = []
-    # for image, label in train_loader:
-    #     # image = gray(image)
-    #     keypoint, descriptor = key_points_extractor.get_keypoints_and_descriptors(image)
-    #     if descriptor is not None:
-    #         histogram = build_histogram(descriptor, clusterer.clusterer)
-    #         preprocessed_image.append(histogram)
-    # print(preprocessed_image)
-
-
-# def build_histogram(descriptor_list, cluster_alg):
-#     histogram = np.zeros(len(cluster_alg.cluster_centers_))
-#     cluster_result = cluster_alg.predict(descriptor_list)
-#     for i in cluster_result:
-#         histogram[i] += 1.0
-#     return histogram
 
 
 if __name__ == "__main__":
