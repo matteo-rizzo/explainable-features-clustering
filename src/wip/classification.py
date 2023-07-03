@@ -2,19 +2,24 @@ import logging
 
 import numpy as np
 import torch
+import torchmetrics
 import yaml
 from torch.utils.data import DataLoader
 from sklearn.svm import LinearSVC
+from torchmetrics import MetricCollection
 
 from src.classes.clustering.Clusterer import Clusterer
+from src.classes.core.Trainer import Trainer
 from src.classes.data.KeypointPetDataset import KeypointPetDataset
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.data.Vocabulary import Vocabulary
+from src.classes.deep_learning.FeedForwardNet import FeedForwardNet
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from src.functional.torch_utils import set_random_seed
 
 
 def main():
+    NUM_WORDS: int = 100
     # --- Console output ---
     logger = logging.getLogger(__name__)
     # --- Load configurations ---
@@ -51,8 +56,8 @@ def main():
     labels = clusterer.fit_predict(flat_train_descriptors)
     centroids = clusterer.get_centroids()
     # --- Cluster plotting ---
-    # ranking = clusterer.rank_clusters(flat_train_descriptors, centroids, labels, print_values=False)
-    # words = [centroids[cluster_label] for (cluster_label, _) in ranking[:NUM_WORDS]]
+    ranking = clusterer.rank_clusters(flat_train_descriptors, centroids, labels, print_values=False)
+    words = [centroids[cluster_label] for (cluster_label, _) in ranking[:NUM_WORDS]]
     # --- AAAAAAAAA ---
     vocab = Vocabulary(centroids, clusterer)
     # TODO: just to be sure
@@ -74,44 +79,20 @@ def main():
         shuffle=True,
         num_workers=config["workers"],
         drop_last=True)
-    # ----------------------------------------------------------------------
-    # Convert the data from torch tensors to numpy arrays
-    data = []
-    labels = []
-    for batch in train_kp_loader:
-        batch_data, batch_labels = batch
-        data.append(batch_data.numpy())
-        labels.append(batch_labels.numpy())
-
-    data = np.concatenate(data)
-    labels = np.concatenate(labels)
-
-    # Create and train the SVM model
-    svm_model = LinearSVC()
-    svm_model.fit(data, labels)
-
-    data = []
-    labels = []
-    for batch in test_kp_loader:
-        batch_data, batch_labels = batch
-        data.append(batch_data.numpy())
-        labels.append(batch_labels.numpy())
-
-    print(svm_model.score(data, labels))
 
     # --- Metrics for training ---
-    # metric_collection = MetricCollection({
-    #     'accuracy': torchmetrics.Accuracy(task="multiclass",
-    #                                       num_classes=config["num_classes"]),
-    # })
+    metric_collection = MetricCollection({
+        'accuracy': torchmetrics.Accuracy(task="multiclass",
+                                          num_classes=config["num_classes"]),
+    })
     # # # --- Training ---
     # # TODO: Transformer?
-    # trainer = Trainer(FeedForwardNet,
-    #                   config=config,
-    #                   hyperparameters=hyperparameters,
-    #                   metric_collection=metric_collection,
-    #                   logger=logger)
-    # trainer.train(train_kp_loader, test_kp_loader, vocab=vocab)
+    trainer = Trainer(FeedForwardNet,
+                      config=config,
+                      hyperparameters=hyperparameters,
+                      metric_collection=metric_collection,
+                      logger=logger)
+    trainer.train(train_kp_loader, test_kp_loader, vocab=vocab)
 
 
 if __name__ == "__main__":

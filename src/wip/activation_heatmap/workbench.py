@@ -1,6 +1,6 @@
+import math
+
 import matplotlib.pyplot as plt
-import numpy as np
-import scipy.stats
 import torch
 import yaml
 
@@ -94,6 +94,34 @@ def main():
 
             # Calculate the squared distance from each grid point to the center (x_coord, y_coord)
             squared_dist = (x_indices - x_coord) ** 2 + (y_indices - y_coord) ** 2
+
+            # Calculate the Gaussian distribution
+            gaussian = torch.exp(-squared_dist / (2 * sigma ** 2))
+
+            # Add the Gaussian values to the heatmap for the corresponding cluster
+            heatmap[cluster] += gaussian
+
+        draw_activation(heatmap)
+
+        # Gaussian parameters
+        # sigma = 10.0  # Controls the spread of the Gaussian
+        heatmap = torch.zeros((clusterer.n_clusters(), generic_config["img_size"], generic_config["img_size"]))
+        # Then, pair coordinates and cluster prediction to assign to layer
+        for kp, cluster in zip(kps, cluster_indexes):
+            x_coord, y_coord = kp.pt
+            scale = kp.size  # Keypoint scale parameter
+            angle = kp.angle  # Keypoint angle parameter (in radians)
+            print(angle)
+            print(scale)
+            # Generate a grid of coordinates corresponding to the heatmap indices
+            x_indices, y_indices = torch.meshgrid(torch.arange(224), torch.arange(224), indexing='ij')
+
+            # Apply scale and angle transformations to the coordinates
+            x_transformed = (x_indices - x_coord) * math.cos(angle) - (y_indices - y_coord) * math.sin(angle)
+            y_transformed = (x_indices - x_coord) * math.sin(angle) + (y_indices - y_coord) * math.cos(angle)
+
+            # Calculate the squared distance from each transformed grid point to the center (0, 0)
+            squared_dist = (x_transformed / scale) ** 2 + (y_transformed / scale) ** 2
 
             # Calculate the Gaussian distribution
             gaussian = torch.exp(-squared_dist / (2 * sigma ** 2))
