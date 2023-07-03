@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import numpy as np
+import scipy.stats
 import torch
 import yaml
 
@@ -6,6 +8,26 @@ from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from src.functional.utils import default_logger
 from src.wip.cluster_extraction import extract_and_cluster
+
+
+def draw_activation(activation_maps):
+    # Create a grid of subplots based on the number of tensors
+    num_rows: int = 3
+    num_cols: int = 3
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(9, 9))
+    im = None
+    for i, tensor in enumerate(activation_maps):
+        row_idx = i // num_cols
+        col_idx = i % num_cols
+        ax = axes[row_idx, col_idx]
+        im = ax.imshow(tensor, cmap='inferno')
+        ax.set_title(f'Heatmap {i + 1}')
+        ax.axis('off')
+    # Create a big colorbar on the right side
+    cax = fig.add_axes([0.92, 0.1, 0.02, 0.8])
+    cb = fig.colorbar(im, cax=cax)
+    # plt.tight_layout()
+    plt.show()
 
 
 def main():
@@ -44,45 +66,45 @@ def main():
     # Take the train loader
     # Load an image
     for img, label in train_loader:
+        plt.imshow(img.squeeze(), cmap='gray')
+        plt.show()
         # Find keypoints
         kps, descs = key_points_extractor.get_keypoints_and_descriptors(img)
         # Predict clustering
         cluster_indexes = clusterer.predict(descs)
         # For now, create a tensor of 0 with as many layers as words
-        torch.zeros((224, 224, clusterer.n_clusters()))
+        heatmap = torch.zeros((clusterer.n_clusters(), generic_config["img_size"], generic_config["img_size"]))
         # Then, pair coordinates and cluster prediction to assign to layer
-        # We can start with the dot, then move to the gaussian bit
+        for kp, cluster in zip(kps, cluster_indexes):
+            x_coord, y_coord = kp.pt
+            # We can start with the dot, then move to the gaussian bit
+            heatmap[cluster, int(x_coord), int(y_coord)] += 1.0
 
-    # TECHNICALLY
-    # Do it on an image
-    # Plot image
-    # Plot image with sift
-    # Plot 9 layers
+        draw_activation(heatmap)
 
-    # ------------------
+        # Gaussian parameters
+        sigma = 10.0  # Controls the spread of the Gaussian
+        heatmap = torch.zeros((clusterer.n_clusters(), generic_config["img_size"], generic_config["img_size"]))
+        # Then, pair coordinates and cluster prediction to assign to layer
+        for kp, cluster in zip(kps, cluster_indexes):
+            x_coord, y_coord = kp.pt
 
-    activation_maps = [torch.randn((224, 224)) for _ in range(9)]
+            # Generate a grid of coordinates corresponding to the heatmap indices
+            x_indices, y_indices = torch.meshgrid(torch.arange(224), torch.arange(224), indexing='ij')
 
-    # Create a grid of subplots based on the number of tensors
-    num_rows: int = 3
-    num_cols: int = 3
+            # Calculate the squared distance from each grid point to the center (x_coord, y_coord)
+            squared_dist = (x_indices - x_coord) ** 2 + (y_indices - y_coord) ** 2
 
-    fig, axes = plt.subplots(num_rows, num_cols, figsize=(9, 9))
-    im = None
-    for i, tensor in enumerate(activation_maps):
-        row_idx = i // num_cols
-        col_idx = i % num_cols
-        ax = axes[row_idx, col_idx]
-        im = ax.imshow(tensor, cmap='inferno')
-        ax.set_title(f'Heatmap {i + 1}')
-        ax.axis('off')
+            # Calculate the Gaussian distribution
+            gaussian = torch.exp(-squared_dist / (2 * sigma ** 2))
 
-    # Create a big colorbar on the right side
-    cax = fig.add_axes([0.92, 0.1, 0.02, 0.8])
-    cb = fig.colorbar(im, cax=cax)
+            # Add the Gaussian values to the heatmap for the corresponding cluster
+            heatmap[cluster] += gaussian
 
-    # plt.tight_layout()
-    plt.show()
+        draw_activation(heatmap)
+        # FIXME
+        break
+    logger.info("Program execution completed.")
 
 
 if __name__ == "__main__":
