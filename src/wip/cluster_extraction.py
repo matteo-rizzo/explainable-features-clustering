@@ -11,12 +11,15 @@ from src.classes.clustering.Clusterer import Clusterer
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 
 
-def extract_and_cluster(clustering_config: dict, key_points_extractor: FeatureExtractingAlgorithm,
-                        logger: logging.Logger, train_loader):
+def extract_and_cluster(clustering_config: dict,
+                        key_points_extractor: FeatureExtractingAlgorithm,
+                        logger: logging.Logger,
+                        data_loader,
+                        train: bool):
     containing_folder: Path = Path("dumps/clustering")
     containing_folder.mkdir(exist_ok=True)
-    keypoints_file = containing_folder / 'keypoints.joblib'
-    descriptors_file = containing_folder / 'descriptors.joblib'
+    keypoints_file = containing_folder / f'keypoints_{"train" if train else "test"}.joblib'
+    descriptors_file = containing_folder / f'descriptors_{"train" if train else "test"}.joblib'
     if os.path.exists(keypoints_file) and os.path.exists(descriptors_file):
         # Load keypoints, descriptors, and clustering results from files
         t0 = time.perf_counter()
@@ -27,12 +30,13 @@ def extract_and_cluster(clustering_config: dict, key_points_extractor: FeatureEx
         logger.info(f"Loaded keypoints, descriptors from file in {(time.perf_counter() - t0):.2f}s.")
     else:
         t0 = time.perf_counter()
-        keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(train_loader)
+        keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(data_loader)
         keypoints_list = keypoints_to_list(keypoints)
         joblib.dump(keypoints_list, keypoints_file)
         joblib.dump(descriptors, descriptors_file)
         logger.info(f"Saved keypoints and descriptors to files in {(time.perf_counter() - t0):.2f}s. ")
     # -- KMEANS Clustering --
+    # Note: clustering should be done on train data only ? TODO: verify
     clustering_file = containing_folder / 'clustering.joblib'
     if os.path.exists(clustering_file):
         t0 = time.perf_counter()
@@ -41,6 +45,8 @@ def extract_and_cluster(clustering_config: dict, key_points_extractor: FeatureEx
         clusterer = joblib.load(clustering_file)
         logger.info(f"Loaded clustering results from file in {(time.perf_counter() - t0):.2f}s.")
     else:
+        if not train:
+            raise FileNotFoundError("Clustering should already exist for test and was not found.")
         t0 = time.perf_counter()
         flat_descriptors = np.concatenate(descriptors)
         clusterer = Clusterer(algorithm="KMEANS", logger=logger, **clustering_config["kmeans_args"])

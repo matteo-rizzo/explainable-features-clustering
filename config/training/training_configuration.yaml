@@ -1,7 +1,8 @@
 # ---------- Data configuration ----------
 num_classes: 37 # Food 101 / Pets 37
 img_size: 224
-num_channels: 500 # # 50 words * 128 sift size * 16 windows
+num_channels: 100
+#  500 # # 50 words * 128 sift size * 16 windows
 
 # --- Training operative configuration ---
 device: "cuda:0" # Cuda device, i.e. 0 or 0,1,2,3 or cpu
@@ -33,7 +34,7 @@ weights: "" # Initial weights path
 hyperparameters: "config/training/hypeparameter_configuration.yaml"  # Hyperparameters path
 project: "dumps/train" # save to project/name
 # TODO: automatize
-name: "fcc_train" # save to project/name
+name: "cnn_train" # save to project/name
 exist_ok: False # existing project/name ok, do not increment
 
 # TODO: ---

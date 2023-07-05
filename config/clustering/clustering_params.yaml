@@ -25,10 +25,7 @@ hac_args:
   "n_clusters": 16
   "metric": "euclidean"
 
-gmm_args:
-  "n_components": 16
-
 kmeans_args:
   # Euclidean should be ok
   # Normalize first? Becomes approximation of cosine
-  "n_clusters": 9
+  "n_clusters": 100

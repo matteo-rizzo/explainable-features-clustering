@@ -5,7 +5,6 @@ import torch
 import torchmetrics
 import yaml
 from torch.utils.data import DataLoader
-from sklearn.svm import LinearSVC
 from torchmetrics import MetricCollection
 
 from src.classes.clustering.Clusterer import Clusterer

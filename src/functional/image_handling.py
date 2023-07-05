@@ -6,13 +6,13 @@ import torch
 
 def kps_to_heatmaps(kps: tuple[cv2.KeyPoint], cluster_indexes: np.ndarray[int], heatmap_args: tuple[int, int, int]):
     """
-    Transforms the keypoints of an image into a n dimensional heatmap where n is the number of clusters
+    Transforms the keypoints of an image into an n dimensional heatmap where n is the number of clusters
     in which the keypoints have been separated.
 
     :param kps: list/tuple of kps for an image
     :param cluster_indexes: Cluster indexes for each keypoint
-    :param heatmap_args: arguments to create the heatmap (num_clusters, width, height)
-    :return:
+    :param heatmap_args: arguments to create the empty heatmap (num_clusters, width, height)
+    :return: heatmap of appropriately scaled and rotated keypoints
     """
     layers, img_w, img_h = heatmap_args
     heatmap = torch.zeros(heatmap_args)
