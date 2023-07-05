@@ -2,13 +2,16 @@ import math
 
 import cv2
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import yaml
 
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
+from src.functional.image_handling import kps_to_heatmaps
 from src.functional.utils import default_logger, rescale_img
 from src.wip.cluster_extraction import extract_and_cluster
+from PIL import Image
 
 
 def draw_activation(activation_maps):
@@ -275,7 +278,47 @@ def printer():
     draw_activation(heatmap)
 
 
+def save():
+    # --- Config ---
+    with open('config/training/training_configuration.yaml', 'r') as f:
+        generic_config: dict = yaml.safe_load(f)
+    with open('config/clustering/clustering_params.yaml', 'r') as f:
+        clustering_config: dict = yaml.safe_load(f)
+    # --- Logger ---
+    logger = default_logger(generic_config["logger"])
+    # --- Dataset ---
+    train_loader = torch.utils.data.DataLoader(OxfordIIITPetDataset(train=True, augment=False),
+                                               batch_size=1,
+                                               shuffle=False,
+                                               num_workers=generic_config["workers"],
+                                               drop_last=False)
+    # -----------------------------------------------------------------------------------
+    # --- Keypoint extraction and feature description ---
+    key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
+
+    clusterer, descriptors, keypoints = extract_and_cluster(clustering_config, key_points_extractor, logger,
+                                                            train_loader)
+    # Load an image
+    for img, label in train_loader:
+        # Find keypoints
+        kps, descs = key_points_extractor.get_keypoints_and_descriptors(img)
+        # Predict clustering
+        cluster_indexes = clusterer.predict(descs)
+        # Then, pair coordinates and cluster prediction to assign to layer
+        heatmap = kps_to_heatmaps(kps, cluster_indexes, (clusterer.n_clusters(), generic_config["img_size"], generic_config["img_size"]))
+
+        draw_activation(heatmap)
+        # torch.save(heatmap, "heatmap.pt")
+        # loaded_heatmap = torch.load('heatmap.pt')
+        # draw_activation(loaded_heatmap)
+        # FIXME
+        break
+    logger.info("Program execution completed.")
+
+
 if __name__ == "__main__":
     # main()
-    main2()
+    # main2()
+    save()
+
     # printer()
