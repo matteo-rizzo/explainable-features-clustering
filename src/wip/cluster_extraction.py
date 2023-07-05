@@ -23,11 +23,11 @@ def extract_and_cluster(clustering_config: dict,
     if os.path.exists(keypoints_file) and os.path.exists(descriptors_file):
         # Load keypoints, descriptors, and clustering results from files
         t0 = time.perf_counter()
-        logger.info("Loading keypoints, descriptors from file...")
+        logger.info(f"Loading {'train' if train else 'test'} keypoints, descriptors from file...")
         keypoints_list = joblib.load(keypoints_file)
         keypoints = list_to_keypoints(keypoints_list)
         descriptors = joblib.load(descriptors_file)
-        logger.info(f"Loaded keypoints, descriptors from file in {(time.perf_counter() - t0):.2f}s.")
+        logger.info(f"Loaded {'train' if train else 'test'} keypoints, descriptors from file in {(time.perf_counter() - t0):.2f}s.")
     else:
         t0 = time.perf_counter()
         keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(data_loader)
