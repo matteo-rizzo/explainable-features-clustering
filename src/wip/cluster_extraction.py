@@ -1,5 +1,6 @@
 import logging
 import os
+import shutil
 import time
 from pathlib import Path
 
@@ -9,7 +10,7 @@ import numpy as np
 
 from src.classes.clustering.Clusterer import Clusterer
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
-import shutil
+
 
 def extract_and_cluster(clustering_config: dict,
                         key_points_extractor: FeatureExtractingAlgorithm,

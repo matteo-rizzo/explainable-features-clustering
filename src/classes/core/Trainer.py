@@ -184,7 +184,7 @@ class Trainer:
         # --- Console logging ---
         batch_number: int = len(dataloader)
         progress_bar = tqdm(enumerate(dataloader), total=batch_number, leave=True)
-        # rolling_metrics = [torch.tensor(0.0, device=self.device), ] * len(self.metrics)
+        rolling_metrics = [torch.tensor(0.0, device=self.device), ] * len(self.metrics)
         # --------------------------------------
         # Iterate dataloader
         for idx, (inputs, targets) in progress_bar:
