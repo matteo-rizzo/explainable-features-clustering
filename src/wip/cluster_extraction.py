@@ -9,14 +9,17 @@ import numpy as np
 
 from src.classes.clustering.Clusterer import Clusterer
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
-
+import shutil
 
 def extract_and_cluster(clustering_config: dict,
                         key_points_extractor: FeatureExtractingAlgorithm,
                         logger: logging.Logger,
                         data_loader,
-                        train: bool = True):
+                        train: bool = True,
+                        clean: bool = False):
     containing_folder: Path = Path("dumps/clustering")
+    if clean:
+        shutil.rmtree(containing_folder)
     containing_folder.mkdir(exist_ok=True)
     keypoints_file = containing_folder / f'keypoints_{"train" if train else "test"}.joblib'
     descriptors_file = containing_folder / f'descriptors_{"train" if train else "test"}.joblib'

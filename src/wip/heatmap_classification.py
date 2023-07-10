@@ -5,6 +5,7 @@ import torchmetrics
 import yaml
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
+import argparse
 
 from src.classes.core.Trainer import Trainer
 from src.classes.data.HeatmapPetDataset import HeatmapPetDataset
@@ -15,7 +16,8 @@ from src.functional.utils import default_logger
 from src.wip.cluster_extraction import extract_and_cluster
 
 
-def prepare_clusters_and_features(config: dict, clustering_config: dict, logger: logging.Logger, train: bool):
+def prepare_clusters_and_features(config: dict, clustering_config: dict, logger: logging.Logger,
+                                  train: bool, clean: bool = False):
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
 
     train_loader = torch.utils.data.DataLoader(OxfordIIITPetDataset(train=train, augment=False),
@@ -28,11 +30,17 @@ def prepare_clusters_and_features(config: dict, clustering_config: dict, logger:
                                                             key_points_extractor,
                                                             logger,
                                                             train_loader,
-                                                            train)
+                                                            train,
+                                                            clean=clean)
     return clusterer, descriptors, keypoints
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Heatmap classification script")
+    parser.add_argument("--clean", action="store_true", default=False,
+                        help="Perform a clean feature extraction and clustering (default: False)")
+    args = parser.parse_args()
+    clean: bool = args.clean
     # --- Config ---
     with open('config/training/training_configuration.yaml', 'r') as f:
         config: dict = yaml.safe_load(f)
@@ -45,7 +53,8 @@ def main():
     # TODO we should cluster on ALL data maybe?
     # TODO: maybe not, seems weird
     # --- TRAIN DS ---
-    clusterer, descriptors, keypoints = prepare_clusters_and_features(config, clustering_config, logger, train=True)
+    clusterer, descriptors, keypoints = prepare_clusters_and_features(config, clustering_config,
+                                                                      logger, train=True, clean=clean)
     train_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=True)
     train_loader_ds = torch.utils.data.DataLoader(train_ds,
                                                   batch_size=config["batch_size"],
@@ -67,6 +76,12 @@ def main():
     metric_collection = MetricCollection({
         'accuracy': torchmetrics.Accuracy(task="multiclass",
                                           num_classes=config["num_classes"]),
+        'macro_F1': torchmetrics.F1Score(task="multiclass",
+                                         average="micro",
+                                         num_classes=config["num_classes"]),
+        'micro_F1': torchmetrics.F1Score(task="multiclass",
+                                         average="micro",
+                                         num_classes=config["num_classes"]),
     })
     # # # --- Training ---
     trainer = Trainer(CNN,

@@ -20,7 +20,6 @@ hdbscan_args:
   "metric": "euclidean"
   "prediction_data": True
 
-
 hac_args:
   "n_clusters": 16
   "metric": "euclidean"
@@ -28,4 +27,4 @@ hac_args:
 kmeans_args:
   # Euclidean should be ok
   # Normalize first? Becomes approximation of cosine
-  "n_clusters": 9
+  "n_clusters": 200
