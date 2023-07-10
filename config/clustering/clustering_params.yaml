@@ -28,4 +28,4 @@ hac_args:
 kmeans_args:
   # Euclidean should be ok
   # Normalize first? Becomes approximation of cosine
-  "n_clusters": 100
+  "n_clusters": 9

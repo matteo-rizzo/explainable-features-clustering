@@ -2,15 +2,15 @@ import cv2
 import numpy as np
 import torch
 import yaml
+from matplotlib import pyplot as plt
 from torch.utils.data import Dataset
 from torchvision.datasets import OxfordIIITPet
 
 from src.classes.clustering.Clusterer import Clusterer
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
-from src.functional.image_handling import kps_to_heatmaps
+from src.functional.image_handling import kps_to_heatmaps, draw_activation
 from src.functional.utils import default_logger
-from src.wip.activation_heatmap.workbench import draw_activation
 from src.wip.cluster_extraction import extract_and_cluster
 
 
@@ -63,15 +63,18 @@ def main():
     ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=True)
 
     loader_ds = torch.utils.data.DataLoader(ds,
-                                            batch_size=50,
+                                            batch_size=1,
                                             shuffle=False,
                                             num_workers=generic_config["workers"],
                                             drop_last=False)
 
-    for heat, label in loader_ds:
-        for x in heat:
-            draw_activation(x)
-            break
+    for i, ((heat, label), (img, label_)) in enumerate(zip(loader_ds, train_loader)):
+        for x, y, z, u in zip(heat, label, img, label_):
+            if i % 50 == 0:
+                plt.imshow(z.squeeze())
+                plt.title(train_loader.dataset.data.classes[u])
+                plt.show()
+                draw_activation(x, loader_ds.dataset.data.classes[y])
 
 
 if __name__ == "__main__":

@@ -7,10 +7,10 @@ num_channels: 100
 # --- Training operative configuration ---
 device: "cuda:0" # Cuda device, i.e. 0 or 0,1,2,3 or cpu
 workers: 0 # Maximum number of dataloader workers
-batch_size: 30 # Total batch size for all GPUs
+batch_size: 128 # Total batch size for all GPUs
 #nominal_batch_size: 20 # ONLY IF ACCUMULATE TRUE
 
-epochs: 10 # Number of training epochs
+epochs: 1 # Number of training epochs
 
 optimizer: "Adam" # [SGD ,Adam ,AdamW, SparseAdam]
 criterion: "CrossEntropyLoss" # [NLLLoss, CrossEntropyLoss]
@@ -34,7 +34,7 @@ weights: "" # Initial weights path
 hyperparameters: "config/training/hypeparameter_configuration.yaml"  # Hyperparameters path
 project: "dumps/train" # save to project/name
 # TODO: automatize
-name: "cnn_train" # save to project/name
+name: "cnn_heatmap_train" # save to project/name
 exist_ok: False # existing project/name ok, do not increment
 
 # TODO: ---

@@ -66,10 +66,15 @@ class Trainer:
         # self.accumulate: int = -1
         # , self.do_warmup, self.do_accumulation = (config["half_precision"],
         #                                          config["warmup"], config["accumulate"])
+
     # --------------------------------------
 
     def __setup_logger(self):
         # --------------------------------------
+        # Remove other things
+        for hdlr in self.__logger.handlers[:]:
+            self.__logger.removeHandler(hdlr)
+        # (Re)-initizialize levels and channels
         self.__logger.setLevel(self.config["logger"])
         ch = logging.StreamHandler()
         ch.setLevel(self.config["logger"])
@@ -123,8 +128,10 @@ class Trainer:
             f'{colorstr("bright_green", "Inference activation function")}: {self.config["inference"]}\n'
             f'{" " * 31}'
             f'{colorstr("bright_green", "Dataset:")}: {train_dataloader.dataset.__class__.__name__}\t'
-            f'{colorstr("bright_green", "Half precision training:")}: {"Yes" if self.config["half_precision"] else "No"}\t'
-            f'{colorstr("bright_green", "Learning rate decay")}: {"Linear" if self.config["linear_lr"] else "One cycle"}\n'
+            f'{colorstr("bright_green", "Half precision training:")}: '
+            f'{"Yes" if self.config["half_precision"] else "No"}\t'
+            f'{colorstr("bright_green", "Learning rate decay")}: '
+            f'{"Linear" if self.config["linear_lr"] else "One cycle"}\n'
             f'{" " * 31}{colorstr("bright_green", "Starting training for")} '
             f'{self.config["epochs"]} epochs...')
         # --------------------------------------
@@ -148,10 +155,12 @@ class Trainer:
                 self.__logger.info("Test dataset was not given: skipping test...")
             # --- Write results ---
             with open(results_file, 'a') as ckpt:
+                # TODO: check results is ok
                 ckpt.write(
-                    progress_description + '%10.4g' * len(self.metrics) % tuple(results) + '\n')  # append metrics
+                    progress_description + '%10.4g' * len(self.metrics) % tuple(results.values()) + '\n')  # append metrics
             # Weighted combination of metrics (for now)
-            fitness_value = fitness(np.array(results).reshape(1, -1))
+            # TODO: check results is ok
+            fitness_value = fitness(np.array(results.values()).reshape(1, -1))
             if fitness_value > best_fitness:
                 best_fitness = fitness_value
             # Save model
@@ -175,17 +184,19 @@ class Trainer:
         # --- Console logging ---
         batch_number: int = len(dataloader)
         progress_bar = tqdm(enumerate(dataloader), total=batch_number, leave=True)
-        rolling_metrics = [torch.tensor(0.0, device=self.device), ] * len(self.metrics)
+        # rolling_metrics = [torch.tensor(0.0, device=self.device), ] * len(self.metrics)
         # --------------------------------------
+        # Iterate dataloader
         for idx, (inputs, targets) in progress_bar:
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
             with torch.no_grad():
                 pred_logits = self.model(inputs)
                 # Softmax/Sigmoid/Whatever selected
+                # Not strictly necessary for torchmetrics but still good practice
                 preds = self.activation(pred_logits)
                 result_dict = self.metrics(preds, targets)
-                # TODO: ROLLING MACRO METRICS = WRONG
+                # TODO: CHECK ROLLING MACRO METRICS
                 rolling_metrics = [x + y for x, y in zip(rolling_metrics, result_dict.values())]
                 batch_desc = f"{colorstr('bold', 'white', '[TEST]' if not on_train else '[TRAIN]')}\t"
                 for metric_name, metric_value in zip(result_dict.keys(), rolling_metrics):
@@ -193,10 +204,14 @@ class Trainer:
                                   f"{metric_value / (idx + 1):.3f}\t"
                 progress_bar.set_description(batch_desc)
         # --------------------------------------
+        # Print per-epoch metrics (test only)
         if not on_train:
+            # Compute the result for each metric in the collection.
+            results = self.metrics.compute()
+            # Note down current learning rate
             current_lr: float = self.optimizer.param_groups[0]['lr']
             epoch_desc = f"{colorstr('bold', 'white', '[Test Metrics]')} "
-            for metric_name, metric_value in zip(result_dict.keys(), rolling_metrics):
+            for metric_name, metric_value in zip(results.keys(), results.values()):
                 epoch_desc += f"\t{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
                               f"{metric_value / batch_number :.3f}"
             epoch_desc += (f"\t{colorstr('bold', 'white', '[Parameters]')} "
@@ -205,7 +220,7 @@ class Trainer:
             # --------------------------------------
             self.__logger.info(epoch_desc)
             # self.__logger.info(f"{'-' * 100}")
-            results = [m.cpu().item() / batch_number for m in rolling_metrics]
+            # results = [m.cpu().item() / batch_number for m in rolling_metrics]
             return results
         # --------------------------------------
 

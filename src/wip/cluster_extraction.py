@@ -15,7 +15,7 @@ def extract_and_cluster(clustering_config: dict,
                         key_points_extractor: FeatureExtractingAlgorithm,
                         logger: logging.Logger,
                         data_loader,
-                        train: bool):
+                        train: bool = True):
     containing_folder: Path = Path("dumps/clustering")
     containing_folder.mkdir(exist_ok=True)
     keypoints_file = containing_folder / f'keypoints_{"train" if train else "test"}.joblib'
@@ -27,7 +27,8 @@ def extract_and_cluster(clustering_config: dict,
         keypoints_list = joblib.load(keypoints_file)
         keypoints = list_to_keypoints(keypoints_list)
         descriptors = joblib.load(descriptors_file)
-        logger.info(f"Loaded {'train' if train else 'test'} keypoints, descriptors from file in {(time.perf_counter() - t0):.2f}s.")
+        logger.info(
+            f"Loaded {'train' if train else 'test'} keypoints, descriptors from file in {(time.perf_counter() - t0):.2f}s.")
     else:
         t0 = time.perf_counter()
         keypoints, descriptors = key_points_extractor.get_keypoints_and_descriptors(data_loader)
