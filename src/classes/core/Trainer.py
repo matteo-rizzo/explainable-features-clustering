@@ -160,7 +160,7 @@ class Trainer:
                     progress_description + '%10.4g' * len(self.metrics) % tuple(results.values()) + '\n')  # append metrics
             # Weighted combination of metrics (for now)
             # TODO: check results is ok
-            fitness_value = fitness(np.array(results.values()).reshape(1, -1))
+            fitness_value = fitness(np.array(list(results.values())).reshape(1, -1))
             if fitness_value > best_fitness:
                 best_fitness = fitness_value
             # Save model
