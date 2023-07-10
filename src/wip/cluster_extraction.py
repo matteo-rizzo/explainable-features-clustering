@@ -18,7 +18,7 @@ def extract_and_cluster(clustering_config: dict,
                         train: bool = True,
                         clean: bool = False):
     containing_folder: Path = Path("dumps/clustering")
-    if clean:
+    if clean and containing_folder.exists():
         shutil.rmtree(containing_folder)
     containing_folder.mkdir(exist_ok=True)
     keypoints_file = containing_folder / f'keypoints_{"train" if train else "test"}.joblib'
