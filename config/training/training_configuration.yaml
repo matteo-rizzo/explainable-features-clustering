@@ -7,10 +7,11 @@ num_channels: 200
 # --- Training operative configuration ---
 device: "cuda:0" # Cuda device, i.e. 0 or 0,1,2,3 or cpu
 workers: 0 # Maximum number of dataloader workers
-batch_size: 40 # Total batch size for all GPUs
-#nominal_batch_size: 20 # ONLY IF ACCUMULATE TRUE
+batch_size: 50
+# Total batch size for all GPUs
+# nominal_batch_size: 20 # ONLY IF ACCUMULATE TRUE
 
-epochs: 1 # Number of training epochs
+epochs: 30 # Number of training epochs
 
 optimizer: "Adam" # [SGD ,Adam ,AdamW, SparseAdam]
 criterion: "CrossEntropyLoss" # [NLLLoss, CrossEntropyLoss]
@@ -23,7 +24,7 @@ half_precision: True
 # accumulate: False
 
 resume: False # Resume most recent training. True = latest, can be string to a specific checkpoint
-nosave: True # Only save final checkpoint
+nosave: False # Only save final checkpoint
 notest: False # Only test final epoch
 test_on_train: True # Test metrics on train data
 logger: "INFO"
