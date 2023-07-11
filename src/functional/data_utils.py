@@ -1,20 +1,8 @@
-import logging
 from typing import Dict
 
 from sklearn.model_selection import StratifiedShuffleSplit
 from torch.utils.data import Subset
 from torchvision.transforms import transforms as T
-
-from src.functional.arc_utils import make_divisible
-
-
-def check_img_size(img_size: int, stride: int = 32, logger: logging.Logger = logging.getLogger(__name__)) -> int:
-    # Verify img_size is a multiple of stride s
-    new_size: int = make_divisible(img_size, int(stride))  # ceil gs-multiple
-    if new_size != img_size:
-        logger.warning(f'WARNING: --img-size {img_size:g} must be multiple '
-                       f'of max stride {stride:g}, updating to {new_size:g}')
-    return new_size
 
 
 def create_stratified_splits(dataset, n_splits=1, train_size=700, test_size=300):
@@ -53,3 +41,5 @@ def get_transform(params: Dict, img_size: int):
         apply_with_p(T.RandomPerspective, params["random_perspective"]),
         T.ToTensor()
     ])
+
+

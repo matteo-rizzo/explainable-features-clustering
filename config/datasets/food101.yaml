@@ -1,5 +1,0 @@
-# Folders
-folder: "dataset/food-101"
-
-# Number of classes
-nc: 101

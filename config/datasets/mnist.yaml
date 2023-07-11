@@ -1,5 +1,0 @@
-# Folders
-folder: "dataset/mnist"
-
-# Number of classes
-nc: 10

@@ -5,12 +5,6 @@ import re
 from pathlib import Path
 
 import colorlog
-import numpy as np
-from torch import Tensor
-
-
-def rescale_img(img: Tensor) -> np.ndarray:
-    return (img.cpu().numpy() * 255).astype(np.uint8)
 
 
 def intersect_dicts(dict_a: dict, dict_b: dict, exclude=()):

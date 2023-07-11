@@ -80,7 +80,7 @@ def find_optimal_n_clusters(clustering_algorithm: str,
                             **kwargs) -> None:
     # --- Config ---
     plot_path: Path = Path("dumps/plots")
-    with open("config/clustering/clustering_grid_search.yaml", encoding="UTF-8") as f:
+    with open("config/clustering/grid_search.yaml", encoding="UTF-8") as f:
         conf_search = yaml.load(f, Loader=yaml.FullLoader)["clustering"]
     config = conf_search[clustering_algorithm.lower()]
     # --- Optional normalization ---
