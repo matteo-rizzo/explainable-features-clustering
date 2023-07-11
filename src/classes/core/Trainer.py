@@ -9,17 +9,22 @@ import colorlog
 import numpy as np
 import torch
 import torch.nn as nn
+import torchmetrics
 import yaml
 from torch.cuda import amp
+from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 from torchmetrics import MetricCollection
+from torchvision import datasets, transforms
 from tqdm.auto import tqdm
 
+from src.classes.deep_learning.CNN import CNN
 from src.classes.deep_learning.factories.ActivationFactory import ActivationFactory
 from src.classes.deep_learning.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from src.functional.lr_schedulers import linear_lrs, one_cycle_lrs
 from src.functional.torch_utils import strip_optimizer, get_device
+from src.functional.utils import default_logger
 from src.functional.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run, colorstr
 
 
@@ -158,7 +163,8 @@ class Trainer:
             with open(results_file, 'a') as ckpt:
                 # TODO: check results is ok
                 ckpt.write(
-                    progress_description + '%10.4g' * len(self.metrics) % tuple(results_values) + '\n')  # append metrics
+                    progress_description + '%10.4g' * len(self.metrics) % tuple(
+                        results_values) + '\n')  # append metrics
             # Weighted combination of metrics (for now)
             # TODO: check results is ok
             fitness_value = fitness(np.array(results_values).reshape(1, -1))
@@ -214,13 +220,12 @@ class Trainer:
             epoch_desc = f"{colorstr('bold', 'white', '[Test Metrics]')} "
             for metric_name, metric_value in zip(results.keys(), results.values()):
                 epoch_desc += f"\t{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
-                              f"{metric_value / batch_number :.3f}"
+                              f"{metric_value :.3f}"
             epoch_desc += (f"\t{colorstr('bold', 'white', '[Parameters]')} "
                            f"{colorstr('bold', 'yellow', 'Current lr')} : {current_lr:.3f} "
                            f"(-{self.optimizer.defaults['lr'] - current_lr:.3f})")
             # --------------------------------------
             self.__logger.info(epoch_desc)
-            # self.__logger.info(f"{'-' * 100}")
             # results = [m.cpu().item() / batch_number for m in rolling_metrics]
             return results
         # --------------------------------------
@@ -479,3 +484,52 @@ class Trainer:
             arguments = str(module)[len(module_type.split(".")[-1]):]
             self.__logger.info(f'{idx:>3}{parameters:10.0f}  {module_type:<40}{arguments}')
         self.__logger.info(f'{"-" * 95}')
+
+
+def test_trainer():
+    # --- Config ---
+    with open('config/training/debug_trainer_config.yaml', 'r') as f:
+        config: dict = yaml.safe_load(f)
+    with open('config/clustering/clustering_params.yaml', 'r') as f:
+        clustering_config: dict = yaml.safe_load(f)
+    with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
+        hyperparameters: dict = yaml.safe_load(f)
+    # --- Logger ---
+    logger = default_logger(config["logger"])
+    # Define the transformation to apply to the data
+    transform = transforms.Compose([
+        transforms.ToTensor(),  # Convert PIL Image to tensor
+        transforms.Normalize((0.5,), (0.5,))  # Normalize pixel values to range [-1, 1]
+    ])
+    # --- TRAIN DS ---
+    # Download and load the MNIST training dataset
+    train_dataset = datasets.MNIST(root="dataset", train=True, transform=transform, download=True)
+    # Create a data loader for the training dataset
+    train_loader_ds = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    # --- TEST DS ---
+    # Download and load the MNIST test dataset
+    test_dataset = datasets.MNIST(root="dataset", train=False, transform=transform, download=True)
+    # Create a data loader for the test dataset
+    test_loader_ds = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    # --- Metrics for training ---
+    metric_collection = MetricCollection({
+        'accuracy': torchmetrics.Accuracy(task="multiclass",
+                                          num_classes=config["num_classes"]),
+        'macro_F1': torchmetrics.F1Score(task="multiclass",
+                                         average="micro",
+                                         num_classes=config["num_classes"]),
+        'micro_F1': torchmetrics.F1Score(task="multiclass",
+                                         average="micro",
+                                         num_classes=config["num_classes"]),
+    })
+    # # # --- Training ---
+    trainer = Trainer(CNN,
+                      config=config,
+                      hyperparameters=hyperparameters,
+                      metric_collection=metric_collection,
+                      logger=logger)
+    trainer.train(train_loader_ds, test_loader_ds)
+
+
+if __name__ == "__main__":
+    test_trainer()
