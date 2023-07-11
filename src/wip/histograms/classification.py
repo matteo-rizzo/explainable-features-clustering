@@ -22,13 +22,13 @@ def main():
     # --- Console output ---
     logger = logging.getLogger(__name__)
     # --- Load configurations ---
-    with open('../../config/training/training_configuration.yaml', 'r') as f:
+    with open('../../../config/training/training_configuration.yaml', 'r') as f:
         config: dict = yaml.safe_load(f)
-    with open('../../config/training/hypeparameter_configuration.yaml', 'r') as f:
+    with open('../../../config/training/hypeparameter_configuration.yaml', 'r') as f:
         hyperparameters: dict = yaml.safe_load(f)
     # with open('config/shi_thomasi_feature_extraction.yaml', 'r') as f:
     #     feature_extraction_config: dict = yaml.safe_load(f)
-    with open('../../config/clustering/clustering_params.yaml', 'r') as f:
+    with open('../../../config/clustering/clustering_params.yaml', 'r') as f:
         clustering_config: dict = yaml.safe_load(f)
     # --- Data loaders ---
     # TODO: necessary for now for the keypoint dataset!

@@ -236,7 +236,7 @@ class Trainer:
         # --- Console logging ---
         epoch_description: str = ""
         batch_number: int = len(train_dataloader)
-        progress_bar = tqdm(enumerate(train_dataloader), total=batch_number)
+        progress_bar = tqdm(enumerate(train_dataloader), total=batch_number, leave=True)
         # Number of warmup iterations, max(config epochs (e.g., 3), 1k iterations)#
         # if self.do_warmup:
         #     warmup_number: int = max(round(self.hyperparameters['warmup_epochs'] * batch_number), 1000)

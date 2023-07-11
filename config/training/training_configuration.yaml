@@ -2,7 +2,6 @@
 num_classes: 37 # Food 101 / Pets 37
 img_size: 224
 num_channels: 200
-#  500 # # 50 words * 128 sift size * 16 windows
 
 # --- Training operative configuration ---
 device: "cuda:0" # Cuda device, i.e. 0 or 0,1,2,3 or cpu
