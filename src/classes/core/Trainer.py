@@ -113,7 +113,7 @@ class Trainer:
         else:
             start_epoch, best_fitness = 0, 0.0
         # --------------------------------------
-        results = (0,) * len(self.metrics)
+        results_values = (0,) * len(self.metrics)
         self.scheduler.last_epoch = start_epoch - 1  # do not move
         if self.do_half:
             self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
@@ -151,16 +151,17 @@ class Trainer:
                 if self.config["test_on_train"]:
                     self.test(train_dataloader, on_train=True)
                 results = self.test(test_dataloader)
+                results_values = [r.cpu() for r in results.values()]
             if is_final_epoch and not test_dataloader:
                 self.__logger.info("Test dataset was not given: skipping test...")
             # --- Write results ---
             with open(results_file, 'a') as ckpt:
                 # TODO: check results is ok
                 ckpt.write(
-                    progress_description + '%10.4g' * len(self.metrics) % tuple(results.values()) + '\n')  # append metrics
+                    progress_description + '%10.4g' * len(self.metrics) % tuple(results_values) + '\n')  # append metrics
             # Weighted combination of metrics (for now)
             # TODO: check results is ok
-            fitness_value = fitness(np.array(list(results.values())).reshape(1, -1))
+            fitness_value = fitness(np.array(results_values).reshape(1, -1))
             if fitness_value > best_fitness:
                 best_fitness = fitness_value
             # Save model
@@ -175,7 +176,7 @@ class Trainer:
             if ckpt.exists():
                 strip_optimizer(ckpt)
         torch.cuda.empty_cache()
-        return results
+        return results_values
         # --------------------------------------
 
     def test(self, dataloader: torch.utils.data.DataLoader, on_train: bool = False):
