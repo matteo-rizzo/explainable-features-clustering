@@ -1,5 +1,4 @@
 import logging
-import math
 
 import cv2
 import numpy as np
@@ -22,26 +21,33 @@ def kps_to_heatmaps(kps: tuple[cv2.KeyPoint], cluster_indexes: np.ndarray[int], 
     # TODO: bottleneck
     layers, img_w, img_h = heatmap_args
     heatmap = torch.zeros(heatmap_args)
-
-    for kp, cluster_idx in zip(kps, cluster_indexes):
-        y_coord, x_coord = kp.pt
-        scale = kp.size  # Keypoint scale parameter
-        angle = kp.angle  # Keypoint angle parameter
-        # Generate a grid of coordinates corresponding to the heatmap indices
-        x_indices, y_indices = torch.meshgrid(torch.arange(img_w), torch.arange(img_h), indexing='ij')
+    # Generate a grid of coordinates corresponding to the heatmap indices
+    x_indices, y_indices = torch.meshgrid(torch.arange(img_w), torch.arange(img_h), indexing='ij')
+    angles: list = []
+    coords: list = []
+    scales: list = []
+    for kp in kps:
+        angles.append(kp.angle)
+        coords.append(kp.pt)
+        scales.append(kp.size)
+    # --- Angles ---
+    # TODO: small loss of precision in angles
+    angles: torch.Tensor = torch.FloatTensor(angles)
+    cos_angles = torch.cos(torch.deg2rad(angles))
+    sin_angles = torch.sin(torch.deg2rad(angles))
+    for idx, cluster_idx in enumerate(cluster_indexes):
         # Shift the coordinates so that the keypoint is at the origin
-        x_indices = x_indices - x_coord
-        y_indices = y_indices - y_coord
+        y_coord, x_coord = coords[idx]
+        x_indices_shifted = x_indices - x_coord
+        y_indices_shifted = y_indices - y_coord
         # Rotate the coordinates by the keypoint angle
-        cos_angle = math.cos(math.radians(angle))
-        sin_angle = math.sin(math.radians(angle))
-        x_rotated = cos_angle * x_indices - sin_angle * y_indices
-        y_rotated = sin_angle * x_indices + cos_angle * y_indices
+        x_rotated = cos_angles[idx] * x_indices_shifted - sin_angles[idx] * y_indices_shifted
+        y_rotated = sin_angles[idx] * x_indices_shifted + cos_angles[idx] * y_indices_shifted
         # Squeeze the coordinates along the y-axis
         y_squeezed = y_rotated / 2  # Change this value to control the amount of squeezing
         # Calculate the squared distance from each grid point to the center (0, 0)
         squared_dist = x_rotated ** 2 + y_squeezed ** 2
-        sigma = scale  # stddev / sqrt of variance
+        sigma = scales[idx]  # stddev / sqrt of variance
         # Calculate the Gaussian distribution
         gaussian = torch.exp(-squared_dist / (2 * sigma ** 2))
         # Add the Gaussian values to the heatmap for the corresponding cluster

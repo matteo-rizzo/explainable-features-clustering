@@ -1,8 +1,9 @@
+import time
+
 import cv2
 import numpy as np
 import torch
 import yaml
-from matplotlib import pyplot as plt
 from torch.utils.data import Dataset
 from torchvision.datasets import OxfordIIITPet
 from tqdm import tqdm
@@ -11,7 +12,6 @@ from src.classes.clustering.Clusterer import Clusterer
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from src.functional.image_handling import kps_to_heatmaps
-from src.visualization.image_visualization import draw_activation
 from src.functional.utils import default_logger
 from src.wip.cluster_extraction import extract_and_cluster
 
@@ -21,36 +21,25 @@ class TestHeatmapDataset(Dataset):
                  descriptors: list,
                  clustering: Clusterer,
                  root: str = "dataset",
-                 train: bool = True,
-                 preload: bool = False):
+                 train: bool = True):
         self.data = OxfordIIITPet(root=root,
                                   split="trainval" if train else "test",
                                   download=True)
         self.keypoints: list[tuple[cv2.KeyPoint]] = keypoints
         self.descriptors: list[np.ndarray] = descriptors
         self.clustering: Clusterer = clustering
-        self.preloaded_heatmaps: list | None = None
-
-        # FIXME: takes way too much RAM, doesn't work.
-        if preload:
-            self.preloaded_heatmaps = []
-            for index, (img, label) in tqdm(enumerate(self.data), desc="Preloading heatmaps...", total=len(self.data)):
-                heatmap = kps_to_heatmaps(self.keypoints[index],
-                                          self.clustering.predict(self.descriptors[index]),
-                                          (self.clustering.n_clusters(), 224, 224))
-                self.preloaded_heatmaps.append((heatmap, label))
 
     def __getitem__(self, index: int):
-        if not self.preloaded_heatmaps:
-            # --- Has not been preloaded ---
-            _, label = self.data[index]
-            heatmap = kps_to_heatmaps(self.keypoints[index],
-                                      self.clustering.predict(self.descriptors[index]),
-                                      (self.clustering.n_clusters(), 224, 224))
-            return heatmap, label
-        else:
-            # --- Has been preloaded ---
-            return self.preloaded_heatmaps[index]
+        # if not self.preloaded_heatmaps:
+        # --- Has not been preloaded ---
+        _, label = self.data[index]
+        heatmap = kps_to_heatmaps(self.keypoints[index],
+                                  self.clustering.predict(self.descriptors[index]),
+                                  (self.clustering.n_clusters(), 224, 224))
+        return heatmap, label
+        # else:
+        #     # --- Has been preloaded ---
+        #     return self.preloaded_heatmaps[index]
 
     def __len__(self):
         return len(self.data)
@@ -78,7 +67,7 @@ def main():
                                                             logger,
                                                             train_loader)
 
-    ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=True)
+    ds = TestHeatmapDataset(keypoints, descriptors, clusterer, train=True)
 
     loader_ds = torch.utils.data.DataLoader(ds,
                                             batch_size=1,
@@ -86,13 +75,34 @@ def main():
                                             num_workers=generic_config["workers"],
                                             drop_last=False)
 
-    for i, ((heat, label), (img, label_)) in enumerate(zip(loader_ds, train_loader)):
-        for x, y, z, u in zip(heat, label, img, label_):
-            if i % 50 == 0:
-                plt.imshow(z.squeeze())
-                plt.title(train_loader.dataset.data.classes[u])
-                plt.show()
-                draw_activation(x, loader_ds.dataset.data.classes[y])
+    min_all = 0.
+    sec_all = 0.
+    loops = 10
+    for x in range(loops):
+        t0 = time.perf_counter()
+        i = 0
+        for _ in loader_ds:
+            a = _
+            i += 1
+            if i == 50:
+                break
+
+        t1 = time.perf_counter()
+        minutes = (t1 - t0) // 60
+        min_all += minutes
+        seconds = (t1 - t0) % 60
+        sec_all += seconds
+        print(f"[{x+1}/{loops}] {minutes:.2f}m {seconds:.2f}s")
+
+    print(f"[avg] {min_all/loops:.2f}m {sec_all/loops:.2f}s")
+
+    # for i, ((heat, label), (img, label_)) in enumerate(zip(loader_ds, train_loader)):
+    #     for x, y, z, u in zip(heat, label, img, label_):
+    #         if i % 50 == 0:
+    #             plt.imshow(z.squeeze())
+    #             plt.title(train_loader.dataset.data.classes[u])
+    #             plt.show()
+    #             draw_activation(x, loader_ds.dataset.data.classes[y])
 
 
 if __name__ == "__main__":

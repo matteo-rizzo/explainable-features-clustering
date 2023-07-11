@@ -84,6 +84,7 @@ def main():
                                          num_classes=config["num_classes"]),
     })
     # # # --- Training ---
+    # TODO: add validation
     trainer = Trainer(CNN,
                       config=config,
                       hyperparameters=hyperparameters,
