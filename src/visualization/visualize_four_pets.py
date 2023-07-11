@@ -4,8 +4,8 @@ import yaml
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
+from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 
 
 def show_4():
@@ -28,7 +28,7 @@ def show_4():
                                                         # (default = 10) Higher = Include KPS with lower edge response
                                                         sigma=1.2)  # (default = 1.2) capture finer details in imgs
     key_points_extractor_2 = FeatureExtractingAlgorithm(algorithm="SIFT",
-                                                        nfeatures=n_feats*2,
+                                                        nfeatures=n_feats * 2,
                                                         # (default = 0 = all) Small images, few features
                                                         nOctaveLayers=3,
                                                         # (default = 3) Default should be ok
@@ -38,7 +38,7 @@ def show_4():
                                                         # (default = 10) Higher = Include KPS with lower edge response
                                                         sigma=1.2)  # (default = 1.2) capture finer details in imgs
     key_points_extractor_3 = FeatureExtractingAlgorithm(algorithm="SIFT",
-                                                        nfeatures=n_feats*4,
+                                                        nfeatures=n_feats * 4,
                                                         # (default = 0 = all) Small images, few features
                                                         nOctaveLayers=3,
                                                         # (default = 3) Default should be ok
@@ -70,7 +70,7 @@ def show_4():
             kp3, _ = key_points_extractor_3.run(img)
             kp4, _ = key_points_extractor_4.run(img)
 
-            print(len(kp1), len(kp2),len(kp3), len(kp4))
+            print(len(kp1), len(kp2), len(kp3), len(kp4))
 
             keypoints = [kp1, kp2, kp3, kp4]
 
@@ -96,6 +96,7 @@ def show_4():
             cv2.imshow('Canvas', resized_canvas)
             cv2.waitKey(0)
             cv2.destroyAllWindows()
+
 
 def count():
     with open('config/training/training_configuration.yaml', 'r') as f:
@@ -126,9 +127,9 @@ def count():
             kp1, _ = key_points_extractor_1.run(img)
 
             n_kps += len(kp1)
-            n_imgs +=1
+            n_imgs += 1
 
-    print(f"images: {n_imgs} keypoints: {n_kps}  average: {n_kps/n_kps:.2f}")
+    print(f"images: {n_imgs} keypoints: {n_kps}  average: {n_kps / n_kps:.2f}")
 
 
 if __name__ == "__main__":

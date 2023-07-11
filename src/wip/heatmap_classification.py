@@ -36,6 +36,7 @@ def prepare_clusters_and_features(config: dict, clustering_config: dict, logger:
 
 
 def main():
+    # --- Argument parsing ---
     parser = argparse.ArgumentParser(description="Heatmap classification script")
     parser.add_argument("--clean", action="store_true", default=False,
                         help="Perform a clean feature extraction and clustering (default: False)")
@@ -50,12 +51,11 @@ def main():
         hyperparameters: dict = yaml.safe_load(f)
     # --- Logger ---
     logger = default_logger(config["logger"])
-    # TODO we should cluster on ALL data maybe?
-    # TODO: maybe not, seems weird
+    # TODO we should cluster on ALL data maybe? maybe not, seems weird
     # --- TRAIN DS ---
     clusterer, descriptors, keypoints = prepare_clusters_and_features(config, clustering_config,
                                                                       logger, train=True, clean=clean)
-    train_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=True)
+    train_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=True, preload=True)
     train_loader_ds = torch.utils.data.DataLoader(train_ds,
                                                   batch_size=config["batch_size"],
                                                   shuffle=True,
@@ -66,7 +66,7 @@ def main():
                                                                       clustering_config,
                                                                       logger,
                                                                       train=False)
-    test_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=False)
+    test_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=False, preload=True)
     test_loader_ds = torch.utils.data.DataLoader(test_ds,
                                                  batch_size=config["batch_size"],
                                                  shuffle=False,
