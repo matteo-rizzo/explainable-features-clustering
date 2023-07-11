@@ -32,6 +32,7 @@ class HeatmapPetDataset(Dataset):
         self.clustering: Clusterer = clustering
         self.preloaded_heatmaps: list | None = None
 
+        # FIXME: takes way too much RAM, doesn't work.
         if preload:
             self.preloaded_heatmaps = []
             for index, (img, label) in tqdm(enumerate(self.data), desc="Preloading heatmaps...", total=len(self.data)):
