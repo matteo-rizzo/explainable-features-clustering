@@ -13,7 +13,6 @@ import torchmetrics
 import yaml
 from torch.cuda import amp
 from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
 from torchmetrics import MetricCollection
 from torchvision import datasets, transforms
 from tqdm.auto import tqdm
@@ -92,6 +91,7 @@ class Trainer:
         # --------------------------------------
 
     def train(self, train_dataloader: torch.utils.data.DataLoader,
+              val_dataloader: torch.utils.data.DataLoader = None,
               test_dataloader: torch.utils.data.DataLoader = None,
               **other_model_params):
         # --- Directories, initialize where things are saved ---
@@ -152,21 +152,27 @@ class Trainer:
             self.scheduler.step()
             # self.exponential_moving_average.update_attr(self.model, include=[.....])
             is_final_epoch: bool = epoch + 1 == self.config["epochs"]
-            if (not self.config["notest"] or is_final_epoch) and test_dataloader:
+            if not self.config["notest"] or is_final_epoch:
+                # Test on training data, if so chosen
                 if self.config["test_on_train"]:
-                    self.test(train_dataloader, on_train=True)
-                results = self.test(test_dataloader)
-                results_values = [r.cpu() for r in results.values()]
-            if is_final_epoch and not test_dataloader:
+                    self.compute_metrics(train_dataloader, split="train")
+                # Test on val data, if so chosen (or final epoch)
+                if val_dataloader:
+                    self.compute_metrics(val_dataloader, split="validation")
+                # Test on test data, if so chosen (or final epoch)
+                if test_dataloader:
+                    results = self.compute_metrics(test_dataloader, split="test")
+                    results_values = [r.cpu() for r in results.values()]
+            # No test set was given and training has finished
+            elif is_final_epoch and not test_dataloader:
                 self.__logger.info("Test dataset was not given: skipping test...")
             # --- Write results ---
             with open(results_file, 'a') as ckpt:
-                # TODO: check results is ok
                 ckpt.write(
                     progress_description + '%10.4g' * len(self.metrics) % tuple(
                         results_values) + '\n')  # append metrics
             # Weighted combination of metrics (for now)
-            # TODO: check results is ok
+            # TODO: fitness is ignored for now
             fitness_value = fitness(np.array(results_values).reshape(1, -1))
             if fitness_value > best_fitness:
                 best_fitness = fitness_value
@@ -185,7 +191,7 @@ class Trainer:
         return results_values
         # --------------------------------------
 
-    def test(self, dataloader: torch.utils.data.DataLoader, on_train: bool = False):
+    def compute_metrics(self, dataloader: torch.utils.data.DataLoader, split: str = "test"):
         # --- Disable training ---
         self.model.eval()
         # --- Console logging ---
@@ -203,16 +209,15 @@ class Trainer:
                 # Not strictly necessary for torchmetrics but still good practice
                 preds = self.activation(pred_logits)
                 result_dict = self.metrics(preds, targets)
-                # TODO: CHECK ROLLING MACRO METRICS
                 rolling_metrics = [x + y for x, y in zip(rolling_metrics, result_dict.values())]
-                batch_desc = f"{colorstr('bold', 'white', '[TEST]' if not on_train else '[TRAIN]')}\t"
+                batch_desc = f"{colorstr('bold', 'white', f'[{split.upper()}]')}\t"
                 for metric_name, metric_value in zip(result_dict.keys(), rolling_metrics):
                     batch_desc += f"{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
                                   f"{metric_value / (idx + 1):.3f}\t"
                 progress_bar.set_description(batch_desc)
         # --------------------------------------
         # Print per-epoch metrics (test only)
-        if not on_train:
+        if split == "test":
             # Compute the result for each metric in the collection.
             results = self.metrics.compute()
             # Note down current learning rate
@@ -226,7 +231,6 @@ class Trainer:
                            f"(-{self.optimizer.defaults['lr'] - current_lr:.3f})")
             # --------------------------------------
             self.__logger.info(epoch_desc)
-            # results = [m.cpu().item() / batch_number for m in rolling_metrics]
             return results
         # --------------------------------------
 

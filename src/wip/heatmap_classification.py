@@ -1,3 +1,4 @@
+import argparse
 import logging
 
 import torch
@@ -5,13 +6,13 @@ import torchmetrics
 import yaml
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
-import argparse
 
 from src.classes.core.Trainer import Trainer
 from src.classes.data.HeatmapPetDataset import HeatmapPetDataset
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.deep_learning.CNN import CNN
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
+from src.functional.data_utils import create_stratified_splits
 from src.functional.utils import default_logger
 from src.wip.cluster_extraction import extract_and_cluster
 
@@ -56,11 +57,21 @@ def main():
     clusterer, descriptors, keypoints = prepare_clusters_and_features(config, clustering_config,
                                                                       logger, train=True, clean=clean)
     train_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=True)
-    train_loader_ds = torch.utils.data.DataLoader(train_ds,
+
+    train_size: int = int(len(train_ds) * 0.8)
+    test_size: int = len(train_ds) - train_size
+    train_split, val_split = create_stratified_splits(train_ds, train_size=train_size, test_size=test_size)
+    train_loader_ds = torch.utils.data.DataLoader(train_split,
                                                   batch_size=config["batch_size"],
                                                   shuffle=True,
                                                   num_workers=config["workers"],
                                                   drop_last=False)
+    # --- VAL DS ---
+    val_loader_ds = torch.utils.data.DataLoader(val_split,
+                                                batch_size=config["batch_size"],
+                                                shuffle=True,
+                                                num_workers=config["workers"],
+                                                drop_last=False)
     # --- TEST DS ---
     clusterer, descriptors, keypoints = prepare_clusters_and_features(config,
                                                                       clustering_config,
@@ -90,7 +101,9 @@ def main():
                       hyperparameters=hyperparameters,
                       metric_collection=metric_collection,
                       logger=logger)
-    trainer.train(train_loader_ds, test_loader_ds)
+    trainer.train(train_dataloader=train_loader_ds,
+                  val_dataloader=val_loader_ds,
+                  test_dataloader=test_loader_ds)
 
 
 if __name__ == "__main__":
