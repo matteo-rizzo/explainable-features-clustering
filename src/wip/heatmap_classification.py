@@ -11,6 +11,8 @@ from src.classes.core.Trainer import Trainer
 from src.classes.data.HeatmapPetDataset import HeatmapPetDataset
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.deep_learning.CNN import CNN
+from src.classes.deep_learning.SmarterCNN import SmarterCNN
+from src.classes.deep_learning.VGG16 import VGG16
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from src.functional.data_utils import create_stratified_splits
 from src.functional.utils import default_logger
@@ -94,9 +96,8 @@ def main():
                                          average="micro",
                                          num_classes=config["num_classes"]),
     })
-    # # # --- Training ---
-    # TODO: add validation
-    trainer = Trainer(CNN,
+    # --- Training ---
+    trainer = Trainer(VGG16,
                       config=config,
                       hyperparameters=hyperparameters,
                       metric_collection=metric_collection,

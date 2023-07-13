@@ -158,7 +158,7 @@ class Trainer:
                     self.compute_metrics(train_dataloader, split="train")
                 # Test on val data, if so chosen (or final epoch)
                 if val_dataloader:
-                    self.compute_metrics(val_dataloader, split="validation")
+                    self.compute_metrics(val_dataloader, split="valid")
                 # Test on test data, if so chosen (or final epoch)
                 if test_dataloader:
                     results = self.compute_metrics(test_dataloader, split="test")
