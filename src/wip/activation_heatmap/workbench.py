@@ -287,9 +287,6 @@ def save():
         heatmap = kps_to_heatmaps(kps, cluster_indexes, (clusterer.n_clusters(), generic_config["img_size"], generic_config["img_size"]))
 
         draw_activation(heatmap)
-        # torch.save(heatmap, "heatmap.pt")
-        # loaded_heatmap = torch.load('heatmap.pt')
-        # draw_activation(loaded_heatmap)
         # FIXME
         break
     logger.info("Program execution completed.")

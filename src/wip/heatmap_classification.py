@@ -7,6 +7,7 @@ import yaml
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
 
+from classes.deep_learning.CNN3D import CNN3D
 from src.classes.core.Trainer import Trainer
 from src.classes.data.HeatmapPetDataset import HeatmapPetDataset
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
@@ -97,7 +98,7 @@ def main():
                                          num_classes=config["num_classes"]),
     })
     # --- Training ---
-    trainer = Trainer(VGG16,
+    trainer = Trainer(CNN3D,
                       config=config,
                       hyperparameters=hyperparameters,
                       metric_collection=metric_collection,
