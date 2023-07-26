@@ -15,7 +15,8 @@ from functional.utilities.utils import default_logger
 from src.wip.cluster_extraction import extract_and_cluster
 
 
-class TestHeatmapDataset(Dataset):
+# TODO: refactor / Just use base class
+class SaveHeatmapDataset(Dataset):
     def __init__(self, keypoints: list,
                  descriptors: list,
                  clustering: Clusterer,
@@ -29,14 +30,15 @@ class TestHeatmapDataset(Dataset):
         self.clustering: Clusterer = clustering
 
     def __getitem__(self, index: int):
-        # --- Has not been preloaded ---
-        _, label = self.data[index]
-        # heatmap = kps_to_heatmaps(self.keypoints[index],
-        #                           self.clustering.predict(self.descriptors[index]),
-        #                           (self.clustering.n_clusters(), 224, 224))
-        # torch.save(heatmap, f"dataset/heatmaps/heatmap_{index}.pt")
-        heatmap = torch.load(f"dataset/heatmaps/heatmap_{index}.pt")
-        return heatmap, label
+        _, label = self.data[index] # else:
+        # Calculate on the fly
+        heatmap_pre = kps_to_heatmaps(self.keypoints[index],
+                                  self.clustering.predict(self.descriptors[index]),
+                                  (self.clustering.n_clusters(), 224, 224))
+        torch.save(heatmap_pre, f"dataset/heatmaps/heatmap_{index}.pt")
+        heatmap_post = torch.load(f"dataset/heatmaps/heatmap_{index}.pt")
+        # assert heatmap_pre == heatmap_post
+        return heatmap_post, label
 
     def __len__(self):
         return len(self.data)
@@ -62,7 +64,7 @@ def main():
                                                             logger,
                                                             train_loader)
     # --------------------------------------------------------------------------------
-    ds = TestHeatmapDataset(keypoints, descriptors, clusterer, train=True)
+    ds = SaveHeatmapDataset(keypoints, descriptors, clusterer, train=True)
 
     loader_ds = torch.utils.data.DataLoader(ds,
                                             batch_size=1,
@@ -71,34 +73,16 @@ def main():
                                             drop_last=False)
 
     logger.info("----------------------------------------------")
-    min_all = 0.
-    sec_all = 0.
-    loops = 10
-    for x in range(loops):
-        t0 = time.perf_counter()
-        i = 0
-        for _ in loader_ds:
-            a = _
-            i += 1
-            # if i == 50:
-            #     break
-
-        t1 = time.perf_counter()
-        minutes = (t1 - t0) // 60
-        min_all += minutes
-        seconds = (t1 - t0) % 60
-        sec_all += seconds
-        logger.info(f"[{x+1}/{loops} (first 50 data points only)] {minutes:.2f}m {seconds:.2f}s")
+    t0 = time.perf_counter()
+    i = 0
+    for _ in loader_ds:
+        a = _
+        # Just get to save
+    t1 = time.perf_counter()
+    minutes = (t1 - t0) // 60
+    seconds = (t1 - t0) % 60
+    logger.info(f"Saved heatmaps in {minutes:.2f}m {seconds:.2f}s")
     logger.info("----------------------------------------------")
-    logger.info(f"[AVG (first 50 data points only)] {min_all/loops:.2f}m {sec_all/loops:.2f}s")
-
-    # for i, ((heat, label), (img, label_)) in enumerate(zip(loader_ds, train_loader)):
-    #     for x, y, z, u in zip(heat, label, img, label_):
-    #         if i % 50 == 0:
-    #             plt.imshow(z.squeeze())
-    #             plt.title(train_loader.dataset.data.classes[u])
-    #             plt.show()
-    #             draw_activation(x, loader_ds.dataset.data.classes[y])
 
 
 if __name__ == "__main__":

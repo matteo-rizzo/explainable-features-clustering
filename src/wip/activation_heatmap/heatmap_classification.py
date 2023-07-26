@@ -7,6 +7,7 @@ import yaml
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
 
+from classes.data.HeatmapPetDatasetPreloaded import HeatmapPetDatasetPreloaded
 from src.classes.core.Trainer import Trainer
 from src.classes.data.HeatmapPetDataset import HeatmapPetDataset
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
@@ -54,10 +55,10 @@ def main():
     logger = default_logger(config["logger"])
     # TODO we should cluster on ALL data maybe? maybe not, seems weird
     # --- TRAIN DS ---
-    clusterer, descriptors, keypoints = prepare_clusters_and_features(config, clustering_config,
+    clusterer_train, descriptors_train, keypoints_train = prepare_clusters_and_features(config, clustering_config,
                                                                       logger, train=True, clean=clean)
-    train_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=True)
-
+    # train_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=True)
+    train_ds = HeatmapPetDatasetPreloaded(keypoints_train, descriptors_train, clusterer_train, train=True)
     train_size: int = int(len(train_ds) * 0.8)
     test_size: int = len(train_ds) - train_size
     train_split, val_split = create_stratified_splits(train_ds, train_size=train_size, test_size=test_size)
@@ -73,11 +74,12 @@ def main():
                                                 num_workers=config["workers"],
                                                 drop_last=False)
     # --- TEST DS ---
-    clusterer, descriptors, keypoints = prepare_clusters_and_features(config,
+    clusterer_test, descriptors_test, keypoints_test = prepare_clusters_and_features(config,
                                                                       clustering_config,
                                                                       logger,
                                                                       train=False)
-    test_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=False)
+    # test_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=False)
+    test_ds = HeatmapPetDatasetPreloaded(keypoints_test, descriptors_test, clusterer_test, train=False)
     test_loader_ds = torch.utils.data.DataLoader(test_ds,
                                                  batch_size=config["batch_size"],
                                                  shuffle=False,
