@@ -1,7 +1,6 @@
 from collections import defaultdict
 from pathlib import Path
 
-import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -13,7 +12,7 @@ from tqdm import tqdm
 from src.classes.clustering.Clusterer import Clusterer
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
-from src.functional.utils import default_logger
+from functional.utilities.utils import default_logger
 
 
 def plot_keypoint_patches(image, keypoints):

@@ -21,10 +21,10 @@ from src.classes.deep_learning.CNN import CNN
 from src.classes.deep_learning.factories.ActivationFactory import ActivationFactory
 from src.classes.deep_learning.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
-from src.functional.lr_schedulers import linear_lrs, one_cycle_lrs
-from src.functional.torch_utils import strip_optimizer, get_device
-from src.functional.utils import default_logger
-from src.functional.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run, colorstr
+from functional.learning.lr_schedulers import linear_lrs, one_cycle_lrs
+from functional.utilities.torch_utils import strip_optimizer, get_device
+from functional.utilities.utils import default_logger
+from functional.utilities.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run, colorstr
 
 
 # TODO - LIST

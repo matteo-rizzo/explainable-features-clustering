@@ -6,7 +6,7 @@ import torch
 import yaml
 from torch import Tensor, nn
 
-from src.functional.arc_utils import parse_model
+from functional.utilities.arc_utils import parse_model
 
 
 class TorchParsableModel(nn.Module):

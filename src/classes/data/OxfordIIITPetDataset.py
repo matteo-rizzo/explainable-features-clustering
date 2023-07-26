@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 from torchvision.datasets import OxfordIIITPet
 from tqdm import tqdm
 
-from src.functional.data_utils import get_transform
+from functional.utilities.data_utils import get_transform
 
 
 class OxfordIIITPetDataset(Dataset):

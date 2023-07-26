@@ -3,7 +3,7 @@ from copy import deepcopy
 
 import torch
 
-from src.functional.utils import copy_attr
+from functional.utilities.utils import copy_attr
 
 
 class ExponentialMovingAverageModel:

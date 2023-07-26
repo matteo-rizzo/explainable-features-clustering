@@ -14,7 +14,7 @@ from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.data.Vocabulary import Vocabulary
 from src.classes.deep_learning.FeedForwardNet import FeedForwardNet
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
-from src.functional.torch_utils import set_random_seed
+from functional.utilities.torch_utils import set_random_seed
 
 
 def main():

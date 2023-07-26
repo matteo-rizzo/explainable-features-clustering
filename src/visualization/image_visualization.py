@@ -20,7 +20,7 @@ def draw_activation(activation_maps, label: str = "Activation"):
     fig.suptitle(label, fontsize=16)
     # Create a big colorbar on the right side
     cax = fig.add_axes([0.92, 0.1, 0.02, 0.8])
-    cb = fig.colorbar(im, cax=cax)
+    fig.colorbar(im, cax=cax)
     # plt.tight_layout()
     plt.show()
 

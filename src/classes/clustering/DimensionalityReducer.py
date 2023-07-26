@@ -3,7 +3,7 @@ import time
 
 import numpy as np
 
-from src.functional.utils import print_minutes, log_on_default
+from functional.utilities.utils import print_minutes, log_on_default
 
 try:
     # Nvidia rapids / cuml gpu support

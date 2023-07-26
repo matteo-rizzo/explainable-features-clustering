@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from src.functional.arc_utils import make_divisible
+from functional.utilities.arc_utils import make_divisible
 
 
 def kps_to_heatmaps(kps: tuple[cv2.KeyPoint], cluster_indexes: np.ndarray[int], heatmap_args: tuple[int, int, int]):

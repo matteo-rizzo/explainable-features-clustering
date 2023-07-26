@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from src.classes.feature_extraction.CornerExtractingAlgorithm import CornerExtractingAlgorithm
-from src.functional.image_handling import rescale_img
+from functional.utilities.image_handling import rescale_img
 from torch import Tensor
 
 class FeatureExtractingAlgorithm:

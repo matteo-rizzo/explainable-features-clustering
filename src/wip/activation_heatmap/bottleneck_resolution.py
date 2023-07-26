@@ -6,13 +6,12 @@ import torch
 import yaml
 from torch.utils.data import Dataset
 from torchvision.datasets import OxfordIIITPet
-from tqdm import tqdm
 
 from src.classes.clustering.Clusterer import Clusterer
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
-from src.functional.image_handling import kps_to_heatmaps
-from src.functional.utils import default_logger
+from functional.utilities.image_handling import kps_to_heatmaps
+from functional.utilities.utils import default_logger
 from src.wip.cluster_extraction import extract_and_cluster
 
 
@@ -30,16 +29,14 @@ class TestHeatmapDataset(Dataset):
         self.clustering: Clusterer = clustering
 
     def __getitem__(self, index: int):
-        # if not self.preloaded_heatmaps:
         # --- Has not been preloaded ---
         _, label = self.data[index]
-        heatmap = kps_to_heatmaps(self.keypoints[index],
-                                  self.clustering.predict(self.descriptors[index]),
-                                  (self.clustering.n_clusters(), 224, 224))
+        # heatmap = kps_to_heatmaps(self.keypoints[index],
+        #                           self.clustering.predict(self.descriptors[index]),
+        #                           (self.clustering.n_clusters(), 224, 224))
+        # torch.save(heatmap, f"dataset/heatmaps/heatmap_{index}.pt")
+        heatmap = torch.load(f"dataset/heatmaps/heatmap_{index}.pt")
         return heatmap, label
-        # else:
-        #     # --- Has been preloaded ---
-        #     return self.preloaded_heatmaps[index]
 
     def __len__(self):
         return len(self.data)
@@ -53,20 +50,18 @@ def main():
         clustering_config: dict = yaml.safe_load(f)
     # --- Logger ---
     logger = default_logger(generic_config["logger"])
-
+    # --- Creation of dataset ---
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
-
     train_loader = torch.utils.data.DataLoader(OxfordIIITPetDataset(train=True, augment=False),
                                                batch_size=1,
                                                shuffle=False,
                                                num_workers=generic_config["workers"],
                                                drop_last=False)
-
     clusterer, descriptors, keypoints = extract_and_cluster(clustering_config,
                                                             key_points_extractor,
                                                             logger,
                                                             train_loader)
-
+    # --------------------------------------------------------------------------------
     ds = TestHeatmapDataset(keypoints, descriptors, clusterer, train=True)
 
     loader_ds = torch.utils.data.DataLoader(ds,
@@ -75,6 +70,7 @@ def main():
                                             num_workers=generic_config["workers"],
                                             drop_last=False)
 
+    logger.info("----------------------------------------------")
     min_all = 0.
     sec_all = 0.
     loops = 10
@@ -84,17 +80,17 @@ def main():
         for _ in loader_ds:
             a = _
             i += 1
-            if i == 50:
-                break
+            # if i == 50:
+            #     break
 
         t1 = time.perf_counter()
         minutes = (t1 - t0) // 60
         min_all += minutes
         seconds = (t1 - t0) % 60
         sec_all += seconds
-        print(f"[{x+1}/{loops}] {minutes:.2f}m {seconds:.2f}s")
-
-    print(f"[avg] {min_all/loops:.2f}m {sec_all/loops:.2f}s")
+        logger.info(f"[{x+1}/{loops} (first 50 data points only)] {minutes:.2f}m {seconds:.2f}s")
+    logger.info("----------------------------------------------")
+    logger.info(f"[AVG (first 50 data points only)] {min_all/loops:.2f}m {sec_all/loops:.2f}s")
 
     # for i, ((heat, label), (img, label_)) in enumerate(zip(loader_ds, train_loader)):
     #     for x, y, z, u in zip(heat, label, img, label_):

@@ -7,16 +7,13 @@ import yaml
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
 
-from classes.deep_learning.CNN3D import CNN3D
 from src.classes.core.Trainer import Trainer
 from src.classes.data.HeatmapPetDataset import HeatmapPetDataset
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.deep_learning.CNN import CNN
-from src.classes.deep_learning.SmarterCNN import SmarterCNN
-from src.classes.deep_learning.VGG16 import VGG16
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
-from src.functional.data_utils import create_stratified_splits
-from src.functional.utils import default_logger
+from functional.utilities.data_utils import create_stratified_splits
+from functional.utilities.utils import default_logger
 from src.wip.cluster_extraction import extract_and_cluster
 
 
@@ -98,7 +95,7 @@ def main():
                                          num_classes=config["num_classes"]),
     })
     # --- Training ---
-    trainer = Trainer(CNN3D,
+    trainer = Trainer(CNN,
                       config=config,
                       hyperparameters=hyperparameters,
                       metric_collection=metric_collection,

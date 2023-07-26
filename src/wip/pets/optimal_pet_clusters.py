@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from src.classes.clustering.Clusterer import Clusterer
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
-from src.functional.utils import default_logger, colorstr
+from functional.utilities.utils import default_logger, colorstr
 
 try:
     # Nvidia rapids / cuml gpu support
