@@ -6,6 +6,7 @@ import torch
 import yaml
 from torch.utils.data import Dataset
 from torchvision.datasets import OxfordIIITPet
+from tqdm import tqdm
 
 from src.classes.clustering.Clusterer import Clusterer
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
@@ -28,6 +29,7 @@ class SaveHeatmapDataset(Dataset):
         self.keypoints: list[tuple[cv2.KeyPoint]] = keypoints
         self.descriptors: list[np.ndarray] = descriptors
         self.clustering: Clusterer = clustering
+        self.split: str = str(int(train))
 
     def __getitem__(self, index: int):
         _, label = self.data[index] # else:
@@ -35,8 +37,8 @@ class SaveHeatmapDataset(Dataset):
         heatmap_pre = kps_to_heatmaps(self.keypoints[index],
                                   self.clustering.predict(self.descriptors[index]),
                                   (self.clustering.n_clusters(), 224, 224))
-        torch.save(heatmap_pre, f"dataset/heatmaps/heatmap_{index}.pt")
-        heatmap_post = torch.load(f"dataset/heatmaps/heatmap_{index}.pt")
+        torch.save(heatmap_pre, f"dataset/heatmaps/heatmap_{self.split}_{index}.pt")
+        heatmap_post = torch.load(f"dataset/heatmaps/heatmap_{self.split}_{index}.pt")
         # assert heatmap_pre == heatmap_post
         return heatmap_post, label
 
@@ -53,8 +55,9 @@ def main():
     # --- Logger ---
     logger = default_logger(generic_config["logger"])
     # --- Creation of dataset ---
+    train: bool = True
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
-    train_loader = torch.utils.data.DataLoader(OxfordIIITPetDataset(train=True, augment=False),
+    train_loader = torch.utils.data.DataLoader(OxfordIIITPetDataset(train=train, augment=False),
                                                batch_size=1,
                                                shuffle=False,
                                                num_workers=generic_config["workers"],
@@ -62,9 +65,10 @@ def main():
     clusterer, descriptors, keypoints = extract_and_cluster(clustering_config,
                                                             key_points_extractor,
                                                             logger,
-                                                            train_loader)
+                                                            train_loader,
+                                                            train)
     # --------------------------------------------------------------------------------
-    ds = SaveHeatmapDataset(keypoints, descriptors, clusterer, train=True)
+    ds = SaveHeatmapDataset(keypoints, descriptors, clusterer, train=train)
 
     loader_ds = torch.utils.data.DataLoader(ds,
                                             batch_size=1,
@@ -75,7 +79,7 @@ def main():
     logger.info("----------------------------------------------")
     t0 = time.perf_counter()
     i = 0
-    for _ in loader_ds:
+    for _ in tqdm(loader_ds, total=len(ds)):
         a = _
         # Just get to save
     t1 = time.perf_counter()

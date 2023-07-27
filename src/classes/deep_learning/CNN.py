@@ -14,11 +14,13 @@ class CNN(nn.Module):
                                kernel_size=3, stride=1, padding=1)
         self.relu1 = nn.ReLU()
         self.pool1 = nn.MaxPool2d(kernel_size=2)
+        self.dropout1 = nn.Dropout(0.1)  # Adding dropout after the first pooling layer
         # ----------------------------------------------------------
         self.conv2 = nn.Conv2d(in_channels=16, out_channels=32,
                                kernel_size=3, stride=1, padding=1)
         self.relu2 = nn.ReLU()
         self.pool2 = nn.MaxPool2d(kernel_size=2)
+        self.dropout2 = nn.Dropout(0.1)  # Adding dropout after the second pooling layer
         # ----------------------------------------------------------
         self.flatten = nn.Flatten()
         # Adjust the input size of the fully connected layer
@@ -32,14 +34,14 @@ class CNN(nn.Module):
         x = self.conv1(x)
         x = self.relu1(x)
         x = self.pool1(x)
+        x = self.dropout1(x)  # Applying dropout after the first pooling layer
         # -----------------
         x = self.conv2(x)
         x = self.relu2(x)
         x = self.pool2(x)
+        x = self.dropout2(x)  # Applying dropout after the second pooling layer
         # -----------------
         x = self.flatten(x)
         x = self.fc1(x)
-        # x = self.relu3(x)
-        # x = self.fc2(x)
         # -----------------
         return x
