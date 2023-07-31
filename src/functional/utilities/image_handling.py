@@ -6,6 +6,7 @@ import torch
 from torch import Tensor
 
 from functional.utilities.arc_utils import make_divisible
+from visualization.image_visualization import draw_activation
 
 
 def kps_to_heatmaps(kps: tuple[cv2.KeyPoint], cluster_indexes: np.ndarray[int], heatmap_args: tuple[int, int, int]):
@@ -53,6 +54,40 @@ def kps_to_heatmaps(kps: tuple[cv2.KeyPoint], cluster_indexes: np.ndarray[int], 
         # Add the Gaussian values to the heatmap for the corresponding cluster
         heatmap[cluster_idx] += gaussian
     return heatmap
+
+def kps_to_mask_heatmaps(image,
+                         kps: tuple[cv2.KeyPoint],
+                         cluster_indexes: np.ndarray[int],
+                         heatmap_args: tuple[int, int, int]):
+    layers, img_w, img_h = heatmap_args
+    heatmap = torch.zeros(heatmap_args)
+    # Generate a grid of coordinates corresponding to the heatmap indices
+    x_indices, y_indices = torch.meshgrid(torch.arange(img_w), torch.arange(img_h), indexing='ij')
+    coords: list = []
+    scales: list = []
+    for kp in kps:
+        coords.append(kp.pt)
+        scales.append(kp.size)
+
+    # Just scale because rotation information is embedded in pixels
+    for idx, cluster_idx in enumerate(cluster_indexes):
+        # Shift the coordinates so that the keypoint is at the origin
+        y_coord, x_coord = coords[idx]
+
+        # Calculate the squared distance from each grid point to the center (0, 0)
+        squared_dist = (x_indices - x_coord) ** 2 + (y_indices - y_coord) ** 2
+        sigma = scales[idx]  # stddev / sqrt of variance
+        # Calculate the Gaussian distribution
+        gaussian = torch.exp(-squared_dist / (2 * sigma ** 2))
+        # Add the Gaussian values to the heatmap for the corresponding cluster
+        heatmap[cluster_idx] += gaussian
+    # Normalize to max 1
+    heatmap /= heatmap.max()
+    heatmap = image * heatmap
+    # draw_activation(heatmap)
+    return heatmap
+
+
 
 
 def check_img_size(img_size: int, stride: int = 32, logger: logging.Logger = logging.getLogger(__name__)) -> int:

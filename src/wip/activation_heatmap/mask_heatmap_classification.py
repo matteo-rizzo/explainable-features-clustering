@@ -6,7 +6,7 @@ import yaml
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
 
-from classes.data.HeatmapPetDatasetPreloaded import HeatmapPetDatasetPreloaded
+from classes.data.MaskHeatmapPetDataset import MaskHeatmapPetDataset
 from functional.utilities.cluster_utilities import prepare_clusters_and_features
 from functional.utilities.data_utils import create_stratified_splits
 from functional.utilities.utils import default_logger
@@ -35,7 +35,7 @@ def main():
     clusterer_train, descriptors_train, keypoints_train = prepare_clusters_and_features(config, clustering_config,
                                                                                         logger, train=True, clean=clean)
     # train_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=True)
-    train_ds = HeatmapPetDatasetPreloaded(keypoints_train, descriptors_train, clusterer_train, train=True)
+    train_ds = MaskHeatmapPetDataset(keypoints_train, descriptors_train, clusterer_train, train=True)
     train_size: int = int(len(train_ds) * 0.8)
     test_size: int = len(train_ds) - train_size
     train_split, val_split = create_stratified_splits(train_ds, train_size=train_size, test_size=test_size)
@@ -56,7 +56,7 @@ def main():
                                                                                      logger,
                                                                                      train=False)
     # test_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=False)
-    test_ds = HeatmapPetDatasetPreloaded(keypoints_test, descriptors_test, clusterer_test, train=False)
+    test_ds = MaskHeatmapPetDataset(keypoints_test, descriptors_test, clusterer_test, train=False)
     test_loader_ds = torch.utils.data.DataLoader(test_ds,
                                                  batch_size=config["batch_size"],
                                                  shuffle=False,
