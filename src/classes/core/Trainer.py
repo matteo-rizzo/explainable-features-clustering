@@ -17,17 +17,26 @@ from torchmetrics import MetricCollection
 from torchvision import datasets, transforms
 from tqdm.auto import tqdm
 
-from src.classes.deep_learning.CNN import CNN
-from src.classes.deep_learning.factories.ActivationFactory import ActivationFactory
-from src.classes.deep_learning.factories.CriterionFactory import CriterionFactory
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from functional.learning.lr_schedulers import linear_lrs, one_cycle_lrs
 from functional.utilities.torch_utils import strip_optimizer, get_device
-from functional.utilities.utils import default_logger
+from functional.utilities.utils import default_logger, log_on_default
 from functional.utilities.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run, colorstr
+from src.classes.deep_learning.CNN import CNN
+from src.classes.deep_learning.factories.ActivationFactory import ActivationFactory
+from src.classes.deep_learning.factories.CriterionFactory import CriterionFactory
+
+try:
+    import wandb
+    log_on_default("INFO", "Weights and Biases initialized")
+    log_on_default("INFO", "You might have to login with wandb.login(wandb.login(key=[your_api_key])")
+    USE_WANDB: bool = True
+except ImportError:
+    log_on_default("INFO", "Weights and Biases not installed. Skipping its import.")
+    USE_WANDB: bool = False
 
 
-# TODO - LIST
+# TODO LIST
 # - Early stopping
 
 def fitness(x: np.ndarray) -> float:
@@ -70,14 +79,19 @@ class Trainer:
         # self.accumulate: int = -1
         # , self.do_warmup, self.do_accumulation = (config["half_precision"],
         #                                          config["warmup"], config["accumulate"])
+        # --- Wandb logging ---
+        if USE_WANDB:
+            # wandb_path: Path = ((Path(config["project"]) / config["name"]) / "wandb")
+            # wandb_path.mkdir(exist_ok=True)
+            self.wandb_run = wandb.init(project=config["name"])
 
     # --------------------------------------
 
     def __setup_logger(self):
         # --------------------------------------
         # Remove other things
-        for hdlr in self.__logger.handlers[:]:
-            self.__logger.removeHandler(hdlr)
+        for handler in self.__logger.handlers[:]:
+            self.__logger.removeHandler(handler)
         # (Re)-initizialize levels and channels
         self.__logger.setLevel(self.config["logger"])
         ch = logging.StreamHandler()
@@ -90,14 +104,11 @@ class Trainer:
         self.__logger.addHandler(ch)
         # --------------------------------------
 
-    def train(self, train_dataloader: torch.utils.data.DataLoader,
-              val_dataloader: torch.utils.data.DataLoader = None,
-              test_dataloader: torch.utils.data.DataLoader = None,
-              **other_model_params):
+    def __initialize(self, **other_model_params):
         # --- Directories, initialize where things are saved ---
         self.__start_or_resume_config()
         save_dir, weights_dir, last_ckpt, best_ckpt, results_file = self.__init_dump_folder()
-        # ---Model ---
+        # --- Model ---
         locally_pretrained: bool = self.config["weights"].endswith('.pt')
         self.__setup_model(locally_pretrained=locally_pretrained, **other_model_params)
         self.__print_model()
@@ -111,6 +122,18 @@ class Trainer:
         self.__setup_scheduler()
         # --- Exponential moving average ---
         # self.exponential_moving_average = ExponentialMovingAverageModel(self.model)
+        return best_ckpt, last_ckpt, locally_pretrained, results_file, save_dir, weights_dir
+
+    def train(self, train_dataloader: torch.utils.data.DataLoader,
+              val_dataloader: torch.utils.data.DataLoader = None,
+              test_dataloader: torch.utils.data.DataLoader = None,
+              **other_model_params):
+        # --- Initialize directories, model, and optimization ---
+        best_ckpt, last_ckpt, locally_pretrained, results_file, save_dir, weights_dir = self.__initialize(
+            **other_model_params)
+        # --- Wandb logging ---
+        if USE_WANDB:
+            self.wandb_run.watch(self.model, log_freq=20)
         # --- Resume pretrained if necessary ---
         if locally_pretrained:
             start_epoch, best_fitness = self.__resume_pretrained(results_file=results_file)
@@ -122,6 +145,7 @@ class Trainer:
         self.scheduler.last_epoch = start_epoch - 1  # do not move
         if self.do_half:
             self.gradient_scaler = amp.GradScaler(enabled=self.device.type[:4] == "cuda")
+        # ----------- LOGGING INFO -------------
         self.__logger.info(
             f'{colorstr("bright_green", "Batch size")}: {self.config["batch_size"]} \t'
             # f'({self.config["nominal_batch_size"]} nominal)\t'
@@ -151,26 +175,14 @@ class Trainer:
             # --- Scheduler ---
             self.scheduler.step()
             # self.exponential_moving_average.update_attr(self.model, include=[.....])
+            # --- Calculate metrics, losses on other data.
             is_final_epoch: bool = epoch + 1 == self.config["epochs"]
-            if not self.config["notest"] or is_final_epoch:
-                # Test on training data, if so chosen
-                if self.config["test_on_train"]:
-                    self.compute_metrics(train_dataloader, split="train")
-                # Test on val data, if so chosen (or final epoch)
-                if val_dataloader:
-                    self.compute_metrics(val_dataloader, split="valid")
-                # Test on test data, if so chosen (or final epoch)
-                if test_dataloader:
-                    results = self.compute_metrics(test_dataloader, split="test")
-                    results_values = [r.cpu() for r in results.values()]
-            # No test set was given and training has finished
-            elif is_final_epoch and not test_dataloader:
-                self.__logger.info("Test dataset was not given: skipping test...")
+            results_values = self.__validate(is_final_epoch, results_values,
+                                             train_dataloader, val_dataloader, test_dataloader)
             # --- Write results ---
             with open(results_file, 'a') as ckpt:
-                ckpt.write(
-                    progress_description + '%10.4g' * len(self.metrics) % tuple(
-                        results_values) + '\n')  # append metrics
+                # Append metrics
+                ckpt.write(progress_description + '%10.4g' * len(self.metrics) % tuple(results_values) + '\n')
             # Weighted combination of metrics (for now)
             # TODO: fitness is ignored for now
             fitness_value = fitness(np.array(results_values).reshape(1, -1))
@@ -191,7 +203,29 @@ class Trainer:
         return results_values
         # --------------------------------------
 
-    def compute_metrics(self, dataloader: torch.utils.data.DataLoader, split: str = "test"):
+    def __validate(self, is_final_epoch: bool, results_values: tuple,
+                   train_dataloader: DataLoader, val_dataloader: DataLoader, test_dataloader: DataLoader):
+        # ---
+        if not self.config["notest"] or is_final_epoch:
+            # Test on training data, if so chosen
+            if self.config["test_on_train"]:
+                self.__compute_metrics(train_dataloader, split="train")
+            # Test on val data, if so chosen
+            if val_dataloader:
+                if self.config["test_on_val"]:
+                    self.__compute_metrics(val_dataloader, split="valid")
+                # FIXME: CALCULATE LOSS
+            # Test on test data, if so chosen (or final epoch)
+            if test_dataloader:
+                # FIXME: CALCULATE LOSS
+                results = self.__compute_metrics(test_dataloader, split="test")
+                results_values = [r.cpu() for r in results.values()]
+        # No test set was given and training has finished
+        elif is_final_epoch and not test_dataloader:
+            self.__logger.info("Test dataset was not given: skipping test...")
+        return results_values
+
+    def __compute_metrics(self, dataloader: torch.utils.data.DataLoader, split: str = "test"):
         # --- Disable training ---
         self.model.eval()
         # --- Console logging ---
@@ -203,17 +237,22 @@ class Trainer:
         for idx, (inputs, targets) in progress_bar:
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
+            # FIXME: something wrong
             with torch.no_grad():
                 pred_logits = self.model(inputs)
                 # Softmax/Sigmoid/Whatever selected
                 # Not strictly necessary for torchmetrics but still good practice
                 preds = self.activation(pred_logits)
+                # loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
+                # For later compute
                 result_dict = self.metrics(preds, targets)
                 rolling_metrics = [x + y for x, y in zip(rolling_metrics, result_dict.values())]
                 batch_desc = f"{colorstr('bold', 'white', f'[{split.upper()}]')}\t"
+                # # batch_desc += "Calculating metrics"
+                # batch_desc += f"{colorstr('bold', 'magenta', f'{str(self.loss_fn)[:-2]}')}: {loss:.4f}"
                 for metric_name, metric_value in zip(result_dict.keys(), rolling_metrics):
                     batch_desc += f"{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
-                                  f"{metric_value / (idx + 1):.3f}\t"
+                                  f"{metric_value / (idx + 1):.3f}\t"  # TODO: fix
                 progress_bar.set_description(batch_desc)
         # --------------------------------------
         # Print per-epoch metrics (test only)
@@ -267,6 +306,9 @@ class Trainer:
                 loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
                 loss.backward()
                 self.optimizer.step()
+            # --- Wandb logging ---
+            if USE_WANDB:
+                self.wandb_run.log({"loss": loss})
             # --- Optimization (warmup/accumulation)---
             # if self.do_warmup:
             #     if n_integrated_batches % self.accumulate == 0:
@@ -293,6 +335,12 @@ class Trainer:
         # TODO: possibly add other parameters
         loss = self.loss_fn(preds, targets.to(self.config["device"]))
         return loss
+
+    # def compute_loader_loss(self, dataloader: torch.utils.data.DataLoader):
+    #     rolling_loss: float = 0.0
+    #     for data, labels in dataloader:
+    #         loss = self.__calculate_loss(preds, targets)
+    #         rolling_loss += loss
 
     # def __warmup_batch(self, inputs: torch.Tensor, batch_number: int,
     #                    epoch: int, i: int, warmup_number: int) -> [torch.Tensor, int]:
@@ -492,10 +540,8 @@ class Trainer:
 
 def test_trainer():
     # --- Config ---
-    with open('config/training/debug_trainer_config.yaml', 'r') as f:
+    with open('config/other/debug_trainer_config.yaml', 'r') as f:
         config: dict = yaml.safe_load(f)
-    with open('config/clustering/clustering_params.yaml', 'r') as f:
-        clustering_config: dict = yaml.safe_load(f)
     with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
         hyperparameters: dict = yaml.safe_load(f)
     # --- Logger ---
@@ -532,7 +578,7 @@ def test_trainer():
                       hyperparameters=hyperparameters,
                       metric_collection=metric_collection,
                       logger=logger)
-    trainer.train(train_loader_ds, test_loader_ds)
+    trainer.train(train_dataloader=train_loader_ds, test_dataloader=test_loader_ds)
 
 
 if __name__ == "__main__":

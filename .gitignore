@@ -1100,3 +1100,4 @@ FodyWeavers.xsd
 /venv/
 /dumps/
 /plots/
+/wandb/
