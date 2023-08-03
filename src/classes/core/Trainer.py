@@ -28,9 +28,9 @@ from src.classes.deep_learning.factories.CriterionFactory import CriterionFactor
 
 try:
     import wandb
-    log_on_default("INFO", "Weights and Biases initialized")
-    log_on_default("INFO", "You might have to login with wandb.login(wandb.login(key=[your_api_key])")
-    USE_WANDB: bool = True
+    log_on_default("INFO", "Weights and Biases initialized.")
+    log_on_default("INFO", "You might have to login with wandb.login(wandb.login(key=[your_api_key])...")
+    USE_WANDB: bool = False
 except ImportError:
     log_on_default("INFO", "Weights and Biases not installed. Skipping its import.")
     USE_WANDB: bool = False
@@ -81,9 +81,7 @@ class Trainer:
         #                                          config["warmup"], config["accumulate"])
         # --- Wandb logging ---
         if USE_WANDB:
-            # wandb_path: Path = ((Path(config["project"]) / config["name"]) / "wandb")
-            # wandb_path.mkdir(exist_ok=True)
-            self.wandb_run = wandb.init(project=config["name"])
+            self.wandb_run = wandb.init(project=config["name"], config=config)
 
     # --------------------------------------
 
