@@ -11,7 +11,7 @@ from functional.utilities.cluster_utilities import prepare_clusters_and_features
 from functional.utilities.data_utils import create_stratified_splits
 from functional.utilities.utils import default_logger
 from src.classes.core.Trainer import Trainer
-from src.classes.deep_learning.CNN import CNN
+from classes.deep_learning.CNNs.CNN import CNN
 
 
 def main():

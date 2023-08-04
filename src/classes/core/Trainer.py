@@ -17,12 +17,13 @@ from torchmetrics import MetricCollection
 from torchvision import datasets, transforms
 from tqdm.auto import tqdm
 
+from classes.deep_learning.CNNs.unet.unet_model import UNet
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from functional.learning.lr_schedulers import linear_lrs, one_cycle_lrs
 from functional.utilities.torch_utils import strip_optimizer, get_device
 from functional.utilities.utils import default_logger, log_on_default
 from functional.utilities.utils import intersect_dicts, increment_path, check_file_exists, get_latest_run, colorstr
-from src.classes.deep_learning.CNN import CNN
+from classes.deep_learning.CNNs.CNN import CNN
 from src.classes.deep_learning.factories.ActivationFactory import ActivationFactory
 from src.classes.deep_learning.factories.CriterionFactory import CriterionFactory
 
@@ -571,7 +572,7 @@ def test_trainer():
                                          num_classes=config["num_classes"]),
     })
     # # # --- Training ---
-    trainer = Trainer(CNN,
+    trainer = Trainer(UNet,
                       config=config,
                       hyperparameters=hyperparameters,
                       metric_collection=metric_collection,

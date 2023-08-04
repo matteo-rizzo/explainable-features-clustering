@@ -27,6 +27,7 @@ resume: False # Resume most recent training. True = latest, can be string to a s
 nosave: False # Only save final checkpoint
 notest: False # Only test final epoch
 test_on_train: True # Test metrics on train data
+test_on_val: True # Test metrics on val data
 logger: "INFO"
 
 # --- Configuration files and paths ---
@@ -34,15 +35,5 @@ architecture_config: "default"
 weights: "" # Initial weights path
 hyperparameters: "config/training/hypeparameter_configuration.yaml"  # Hyperparameters path
 project: "dumps/train" # save to project/name
-# TODO: automatize
-name: "cnn_heatmap_train" # save to project/name
+name: "debug_train" # save to project/name
 exist_ok: False # existing project/name ok, do not increment
-
-# TODO: ---
-# label_smoothing: 0.0 # Label smoothing epsilon
-# cache_images: False # Cache images for faster training
-# image_weights: False # Use weighted image selection for training
-# quad: False # [experimental] may allow some benefits of higher --img size training at lower --img sizes.
-# --- Special training parameters ---
-#evolve: True # Evolve hyperparameters
-#evolve_epochs: 300 # Epochs of evolution

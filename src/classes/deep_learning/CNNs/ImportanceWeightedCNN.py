@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch import Tensor, nn
 
-from src.classes.deep_learning.CNN import CNN
+from classes.deep_learning.CNNs.CNN import CNN
 
 CONFIG_PATH = os.path.join("config", "architectures", "importance_weighted_cnn.yaml")
 

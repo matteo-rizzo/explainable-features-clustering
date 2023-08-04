@@ -26,6 +26,7 @@ resume: False # Resume most recent training. True = latest, can be string to a s
 nosave: False # Only save final checkpoint
 notest: False # Only test final epoch
 test_on_train: True # Test metrics on train data
+test_on_val: True # Test metrics on val data
 logger: "INFO"
 
 # --- Configuration files and paths ---
