@@ -17,6 +17,8 @@ from torchmetrics import MetricCollection
 from torchvision import datasets, transforms
 from tqdm.auto import tqdm
 
+from classes.deep_learning.CNNs.HyperSpectralCNN import HyperSpectralCNN
+from classes.deep_learning.CNNs.resnet.ResNet import ResNet34
 from classes.deep_learning.CNNs.unet.unet_model import UNet
 # from classes.deep_learning.architectures.modules.ExponentialMovingAverage import ExponentialMovingAverageModel
 from functional.learning.lr_schedulers import linear_lrs, one_cycle_lrs
@@ -572,7 +574,7 @@ def test_trainer():
                                          num_classes=config["num_classes"]),
     })
     # # # --- Training ---
-    trainer = Trainer(UNet,
+    trainer = Trainer(HyperSpectralCNN,
                       config=config,
                       hyperparameters=hyperparameters,
                       metric_collection=metric_collection,
