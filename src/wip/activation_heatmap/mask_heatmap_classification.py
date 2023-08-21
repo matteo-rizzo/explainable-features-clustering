@@ -8,6 +8,7 @@ from torchmetrics import MetricCollection
 
 from classes.data.MaskHeatmapPetDataset import MaskHeatmapPetDataset
 from classes.deep_learning.CNNs.HyperSpectralCNN import HyperSpectralCNN
+from classes.deep_learning.CNNs.SmarterCNN import SmarterCNN
 from functional.utilities.cluster_utilities import prepare_clusters_and_features
 from functional.utilities.data_utils import create_stratified_splits
 from functional.utilities.utils import default_logger
@@ -31,7 +32,6 @@ def main():
         hyperparameters: dict = yaml.safe_load(f)
     # --- Logger ---
     logger = default_logger(config["logger"])
-    # TODO we should cluster on ALL data maybe? maybe not, seems weird
     # --- TRAIN DS ---
     clusterer_train, descriptors_train, keypoints_train = prepare_clusters_and_features(config, clustering_config,
                                                                                         logger, train=True, clean=clean)
@@ -67,15 +67,15 @@ def main():
     metric_collection = MetricCollection({
         'accuracy': torchmetrics.Accuracy(task="multiclass",
                                           num_classes=config["num_classes"]),
-        'macro_F1': torchmetrics.F1Score(task="multiclass",
-                                         average="micro",
-                                         num_classes=config["num_classes"]),
-        'micro_F1': torchmetrics.F1Score(task="multiclass",
-                                         average="micro",
-                                         num_classes=config["num_classes"]),
+        # 'macro_F1': torchmetrics.F1Score(task="multiclass",
+        #                                  average="micro",
+        #                                  num_classes=config["num_classes"]),
+        # 'micro_F1': torchmetrics.F1Score(task="multiclass",
+        #                                  average="micro",
+        #                                  num_classes=config["num_classes"]),
     })
     # --- Training ---
-    trainer = Trainer(HyperSpectralCNN,
+    trainer = Trainer(SmarterCNN,
                       config=config,
                       hyperparameters=hyperparameters,
                       metric_collection=metric_collection,

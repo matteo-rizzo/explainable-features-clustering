@@ -6,7 +6,7 @@ from tqdm import tqdm
 from classes.data.MaskHeatmapPetDataset import MaskHeatmapPetDataset
 from functional.utilities.utils import default_logger
 from functional.utilities.cluster_utilities import prepare_clusters_and_features
-from visualization.image_visualization import draw_activation
+from visualization.image_visualization import draw_9x9_activation, draw_1x1_activations
 
 
 def main():
@@ -19,7 +19,6 @@ def main():
         hyperparameters: dict = yaml.safe_load(f)
     # --- Logger ---
     logger = default_logger(config["logger"])
-    # TODO we should cluster on ALL data maybe? maybe not, seems weird
     # --- TRAIN DS ---
     clusterer_train, descriptors_train, keypoints_train = prepare_clusters_and_features(config, clustering_config,
                                                                                         logger, train=True)
@@ -27,14 +26,13 @@ def main():
     train_ds = MaskHeatmapPetDataset(keypoints_train, descriptors_train, clusterer_train, train=True)
 
     loader_ds = torch.utils.data.DataLoader(train_ds,
-                                            batch_size=1,
+                                            batch_size=5,
                                             shuffle=False,
                                             num_workers=config["workers"],
                                             drop_last=False)
 
     for heatmap, label in tqdm(loader_ds, total=len(train_ds), desc=f"Drawing masks"):
-        # TODO: might need fixing
-        draw_activation(heatmap)
+        draw_1x1_activations(heatmap)
         break
 
 

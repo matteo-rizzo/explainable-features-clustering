@@ -16,10 +16,12 @@ class MaskHeatmapPetDataset(Dataset):
                  root: str = "dataset",
                  train: bool = True):
         transforms = T.Compose([
-            T.Resize(224),
+            T.ToTensor(),
+            T.Resize(224, antialias=True),
             T.CenterCrop((224, 224)),
-            T.Grayscale(),
-            T.ToTensor()
+            # TODO: should we? It's the imagenet classic
+            T.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+            T.Grayscale()
         ])
         self.data = OxfordIIITPet(root=root,
                                   transform=transforms,

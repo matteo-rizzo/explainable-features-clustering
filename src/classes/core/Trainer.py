@@ -232,13 +232,15 @@ class Trainer:
         # --- Console logging ---
         batch_number: int = len(dataloader)
         progress_bar = tqdm(enumerate(dataloader), total=batch_number, leave=True)
-        rolling_metrics = [torch.tensor(0.0, device=self.device), ] * len(self.metrics)
+        # FIXME: something wrong in rolling metrics (I think)
+        # rolling_metrics = [torch.tensor(0.0, device=self.device), ] * len(self.metrics)
+        rolling_loss: float = 0.0
         # --------------------------------------
         # Iterate dataloader
         for idx, (inputs, targets) in progress_bar:
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
-            # FIXME: something wrong
+
             with torch.no_grad():
                 pred_logits = self.model(inputs)
                 # Softmax/Sigmoid/Whatever selected
@@ -246,32 +248,37 @@ class Trainer:
                 preds = self.activation(pred_logits)
                 # loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
                 # For later compute
-                result_dict = self.metrics(preds, targets)
-                rolling_metrics = [x + y for x, y in zip(rolling_metrics, result_dict.values())]
+                # result_dict = self.metrics(preds, targets)
+                self.metrics.update(preds, targets)
+                rolling_loss += self.__calculate_loss(preds, targets)
+                # rolling_metrics = [x + y for x, y in zip(rolling_metrics, result_dict.values())]
                 batch_desc = f"{colorstr('bold', 'white', f'[{split.upper()}]')}\t"
+                batch_desc += f"{colorstr('bold', 'magenta', f'{str(self.loss_fn)[:-2]}')}: " \
+                              f"{rolling_loss / (idx + 1):.3f}\t"  # TODO: fix
                 # # batch_desc += "Calculating metrics"
                 # batch_desc += f"{colorstr('bold', 'magenta', f'{str(self.loss_fn)[:-2]}')}: {loss:.4f}"
-                for metric_name, metric_value in zip(result_dict.keys(), rolling_metrics):
-                    batch_desc += f"{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
-                                  f"{metric_value / (idx + 1):.3f}\t"  # TODO: fix
+                # for metric_name, metric_value in zip(result_dict.keys(), rolling_metrics):
+                #     batch_desc += f"{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
+                #                   f"{metric_value / (idx + 1):.3f}\t"  # TODO: fix
                 progress_bar.set_description(batch_desc)
         # --------------------------------------
-        # Print per-epoch metrics (test only)
-        if split == "test":
-            # Compute the result for each metric in the collection.
-            results = self.metrics.compute()
-            # Note down current learning rate
-            current_lr: float = self.optimizer.param_groups[0]['lr']
-            epoch_desc = f"{colorstr('bold', 'white', '[Test Metrics]')} "
-            for metric_name, metric_value in zip(results.keys(), results.values()):
-                epoch_desc += f"\t{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
-                              f"{metric_value :.3f}"
-            epoch_desc += (f"\t{colorstr('bold', 'white', '[Parameters]')} "
-                           f"{colorstr('bold', 'yellow', 'Current lr')} : {current_lr:.3f} "
-                           f"(-{self.optimizer.defaults['lr'] - current_lr:.3f})")
-            # --------------------------------------
-            self.__logger.info(epoch_desc)
-            return results
+        ######### Print per-epoch metrics (test only)
+        ######### if split == "test":
+
+        # Compute the result for each metric in the collection.
+        results = self.metrics.compute()
+        # Note down current learning rate
+        current_lr: float = self.optimizer.param_groups[0]['lr']
+        epoch_desc = f"{colorstr('bold', 'white', '[Test Metrics]')} "
+        for metric_name, metric_value in zip(results.keys(), results.values()):
+            epoch_desc += f"\t{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
+                          f"{metric_value :.3f}"
+        epoch_desc += (f"\t{colorstr('bold', 'white', '[Parameters]')} "
+                       f"{colorstr('bold', 'yellow', 'Current lr')} : {current_lr:.3f} "
+                       f"(-{self.optimizer.defaults['lr'] - current_lr:.3f})")
+        # --------------------------------------
+        self.__logger.info(epoch_desc)
+        return results
         # --------------------------------------
 
     def __train_one_epoch(self, train_dataloader: torch.utils.data.DataLoader, epoch: int):

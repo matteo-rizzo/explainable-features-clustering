@@ -6,7 +6,7 @@ import torch
 from torch import Tensor
 
 from functional.utilities.arc_utils import make_divisible
-from visualization.image_visualization import draw_activation
+from visualization.image_visualization import draw_9x9_activation
 
 
 def kps_to_heatmaps(kps: tuple[cv2.KeyPoint], cluster_indexes: np.ndarray[int], heatmap_args: tuple[int, int, int]):
@@ -85,6 +85,7 @@ def kps_to_mask_heatmaps(image,
     heatmap /= heatmap.max()
     heatmap = image * heatmap
     # draw_activation(heatmap)
+
     return heatmap
 
 

@@ -11,7 +11,7 @@ from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from functional.utilities.image_handling import kps_to_heatmaps
 from functional.utilities.utils import default_logger
-from src.visualization.image_visualization import draw_activation
+from src.visualization.image_visualization import draw_9x9_activation
 from src.wip.cluster_extraction import extract_and_cluster
 
 
@@ -76,7 +76,7 @@ def main():
                 plt.imshow(z.squeeze())
                 plt.title(train_loader.dataset.data.classes[u])
                 plt.show()
-                draw_activation(x, loader_ds.dataset.data.classes[y])
+                draw_9x9_activation(x, loader_ds.dataset.data.classes[y])
 
 
 if __name__ == "__main__":

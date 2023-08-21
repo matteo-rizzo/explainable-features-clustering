@@ -2,7 +2,18 @@ import torch
 from matplotlib import pyplot as plt
 
 
-def draw_activation(activation_maps, label: str = "Activation"):
+def draw_1x1_activations(activation_maps, label: str = "Activation"):
+    # Iterate batches
+    for i, tensor in enumerate(activation_maps):
+        # Iterate channels
+        for j, image in enumerate(tensor):
+            plt.imshow(image, cmap='gray', vmin=0, vmax=1)
+            plt.colorbar()  # Add colorbar to show color scale
+            plt.title(f"{label} [{j}]")
+            plt.savefig(f"plots/activations/{label}_{i}_{j}.png")
+            plt.clf()  # Clear the figure for the next channel
+
+def draw_9x9_activation(activation_maps, label: str = "Activation"):
     # Create a grid of subplots based on the number of tensors
     num_rows: int = 3
     num_cols: int = 3

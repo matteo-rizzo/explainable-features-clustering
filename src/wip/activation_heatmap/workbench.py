@@ -8,7 +8,7 @@ import yaml
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from functional.utilities.image_handling import kps_to_heatmaps, rescale_img
-from src.visualization.image_visualization import draw_activation
+from src.visualization.image_visualization import draw_9x9_activation
 from functional.utilities.utils import default_logger
 from src.wip.cluster_extraction import extract_and_cluster
 
@@ -89,8 +89,8 @@ def main():
             # TODO: remove
             giga_heatmap[0] += gaussian
 
-        draw_activation(heatmap)
-        draw_activation(giga_heatmap)
+        draw_9x9_activation(heatmap)
+        draw_9x9_activation(giga_heatmap)
         # ---------- WITH ROTATION ----------
         # # Predict clustering
         # cluster_indexes = clusterer.predict(descs)
@@ -209,8 +209,8 @@ def main2():
             # TODO: remove
             giga_heatmap[0] += gaussian
 
-        draw_activation(heatmap)
-        draw_activation(giga_heatmap)
+        draw_9x9_activation(heatmap)
+        draw_9x9_activation(giga_heatmap)
         # FIXME
         break
     logger.info("Program execution completed.")
@@ -254,7 +254,7 @@ def printer():
         # Assign the Gaussian to the corresponding layer
         heatmap[i] = gaussian
 
-    draw_activation(heatmap)
+    draw_9x9_activation(heatmap)
 
 
 def save():
@@ -286,7 +286,7 @@ def save():
         # Then, pair coordinates and cluster prediction to assign to layer
         heatmap = kps_to_heatmaps(kps, cluster_indexes, (clusterer.n_clusters(), generic_config["img_size"], generic_config["img_size"]))
 
-        draw_activation(heatmap)
+        draw_9x9_activation(heatmap)
         # FIXME
         break
     logger.info("Program execution completed.")
