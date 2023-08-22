@@ -224,6 +224,8 @@ class Trainer:
         # No test set was given and training has finished
         elif is_final_epoch and not test_dataloader:
             self.__logger.info("Test dataset was not given: skipping test...")
+        # ---
+        self.__logger.info("----------------------------------------------")
         return results_values
 
     def __compute_metrics(self, dataloader: torch.utils.data.DataLoader, split: str = "test"):
@@ -269,7 +271,7 @@ class Trainer:
         results = self.metrics.compute()
         # Note down current learning rate
         current_lr: float = self.optimizer.param_groups[0]['lr']
-        epoch_desc = f"{colorstr('bold', 'white', '[Test Metrics]')} "
+        epoch_desc = f"{colorstr('bold', 'white', f'[{split.title()} Metrics]')} "
         for metric_name, metric_value in zip(results.keys(), results.values()):
             epoch_desc += f"\t{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
                           f"{metric_value :.3f}"
@@ -421,7 +423,7 @@ class Trainer:
             self.checkpoint = torch.load(self.config["weights"], map_location=self.device)
             self.model = self.model_class(
                 config=self.config,
-                config_path=self.config["architecture_config"] or self.checkpoint['model'].yaml,
+                config_path=self.config["architecture_config"],  # or self.checkpoint['model'].yaml,
                 logger=self.__logger,
                 **other_model_params
             ).to(self.device)

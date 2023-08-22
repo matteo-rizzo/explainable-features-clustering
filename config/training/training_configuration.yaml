@@ -10,7 +10,7 @@ batch_size: 30
 # Total batch size for all GPUs
 # nominal_batch_size: 20 # ONLY IF ACCUMULATE TRUE
 
-epochs: 30 # Number of training epochs
+epochs: 200 # Number of training epochs
 
 optimizer: "Adam" # [SGD ,Adam ,AdamW, SparseAdam]
 criterion: "CrossEntropyLoss" # [NLLLoss, CrossEntropyLoss]
@@ -23,6 +23,7 @@ half_precision: True
 # accumulate: False
 
 resume: False # Resume most recent training. True = latest, can be string to a specific checkpoint
+# NOTE: Resume is to resume an interrupted training. If you want to use weights, use "weights" below
 nosave: False # Only save final checkpoint
 notest: False # Only test final epoch
 test_on_train: True # Test metrics on train data
@@ -31,7 +32,7 @@ logger: "INFO"
 
 # --- Configuration files and paths ---
 architecture_config: "default"
-weights: "" # Initial weights path
+weights: "dumps/train/cnn_heatmap_train_401/weights/last.pt" # Initial weights path
 hyperparameters: "config/training/hypeparameter_configuration.yaml"  # Hyperparameters path
 project: "dumps/train" # save to project/name
 # TODO: automatize
