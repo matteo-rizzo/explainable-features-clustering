@@ -588,7 +588,8 @@ def test_trainer():
                       hyperparameters=hyperparameters,
                       metric_collection=metric_collection,
                       logger=logger)
-    trainer.train(train_dataloader=train_loader_ds, test_dataloader=test_loader_ds)
+    trainer.train(train_dataloader=train_loader_ds,
+                  test_dataloader=test_loader_ds)
 
 
 if __name__ == "__main__":

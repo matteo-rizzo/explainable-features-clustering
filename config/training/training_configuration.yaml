@@ -1,12 +1,12 @@
 # ---------- Data configuration ----------
 num_classes: 37 # Food 101 / Pets 37
 img_size: 224
-num_channels: 10
+num_channels: 100
 
 # --- Training operative configuration ---
 device: "cuda:0" # Cuda device, i.e. 0 or 0,1,2,3 or cpu
 workers: 0 # Maximum number of dataloader workers
-batch_size: 30
+batch_size: 5
 # Total batch size for all GPUs
 # nominal_batch_size: 20 # ONLY IF ACCUMULATE TRUE
 
@@ -32,7 +32,7 @@ logger: "INFO"
 
 # --- Configuration files and paths ---
 architecture_config: "default"
-weights: "dumps/train/cnn_heatmap_train_401/weights/last.pt" # Initial weights path
+weights: "" # Initial weights path
 hyperparameters: "config/training/hypeparameter_configuration.yaml"  # Hyperparameters path
 project: "dumps/train" # save to project/name
 # TODO: automatize

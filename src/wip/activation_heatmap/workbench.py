@@ -10,7 +10,7 @@ from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExt
 from functional.utilities.image_handling import kps_to_heatmaps, rescale_img
 from src.visualization.image_visualization import draw_9x9_activation
 from functional.utilities.utils import default_logger
-from src.wip.cluster_extraction import extract_and_cluster
+from functional.utilities.cluster_extraction import extract_and_cluster
 
 
 def main():

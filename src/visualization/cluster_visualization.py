@@ -13,7 +13,7 @@ from tqdm import tqdm
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
 from functional.utilities.utils import default_logger
-from src.wip.cluster_extraction import extract_and_cluster
+from functional.utilities.cluster_extraction import extract_and_cluster
 
 
 def extract_patch(img, keypoint, patch_size: int = 24, larger_patch: int = 32):  # , min_patch_size: int = 16):

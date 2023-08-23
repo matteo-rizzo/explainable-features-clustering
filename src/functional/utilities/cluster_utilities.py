@@ -4,7 +4,7 @@ import torch
 
 from classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from classes.feature_extraction.FeatureExtractingAlgorithm import FeatureExtractingAlgorithm
-from wip.cluster_extraction import extract_and_cluster
+from functional.utilities.cluster_extraction import extract_and_cluster
 
 
 def prepare_clusters_and_features(config: dict, clustering_config: dict, logger: logging.Logger,
