@@ -89,7 +89,7 @@ def plot_cluster_sift_patches():
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
 
     clusterer, descriptors, keypoints = extract_and_cluster(clustering_config, key_points_extractor, logger,
-                                                            train_loader)
+                                                            train_loader, clustering_algorithm="hac")
 
     # --- PLOTTING ---
     cluster_patches = defaultdict(list)

@@ -21,7 +21,7 @@ hdbscan_args:
   "prediction_data": True
 
 hac_args:
-  "n_clusters": 16
+  "n_clusters": 1024
   "metric": "euclidean"
 
 kmeans_args:

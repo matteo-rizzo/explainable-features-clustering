@@ -17,7 +17,8 @@ def extract_and_cluster(clustering_config: dict,
                         logger: logging.Logger,
                         data_loader,
                         train: bool = True,
-                        clean: bool = False):
+                        clean: bool = False,
+                        clustering_algorithm: str = "kmeans"):
     containing_folder: Path = Path("dumps/clustering")
     if clean and containing_folder.exists():
         shutil.rmtree(containing_folder)
@@ -42,7 +43,10 @@ def extract_and_cluster(clustering_config: dict,
         logger.info(f"Saved keypoints and descriptors to files in {(time.perf_counter() - t0):.2f}s. ")
     # -- KMEANS Clustering --
     # Note: clustering should be done on train data only ? TODO: verify
-    clustering_file = containing_folder / 'clustering.joblib'
+    clustering_file = containing_folder / (f'clustering_'
+                                           f'{clustering_algorithm}_'
+                                           f'{clustering_config[f"{clustering_algorithm}_args"]["n_clusters"]}'
+                                           f'.joblib')
     if os.path.exists(clustering_file):
         t0 = time.perf_counter()
         logger.info("Loading clustering from file...")
@@ -54,7 +58,8 @@ def extract_and_cluster(clustering_config: dict,
             raise FileNotFoundError("Clustering should already exist for test and was not found.")
         t0 = time.perf_counter()
         flat_descriptors = np.concatenate(descriptors)
-        clusterer = Clusterer(algorithm="KMEANS", logger=logger, **clustering_config["kmeans_args"])
+        clusterer = Clusterer(algorithm=clustering_algorithm, logger=logger,
+                              **clustering_config[f"{clustering_algorithm}_args"])
         clusterer.fit_predict(flat_descriptors)
         joblib.dump(clusterer, clustering_file)
         logger.info(f"Saved clustering results to file in {(time.perf_counter() - t0):.2f}s.")

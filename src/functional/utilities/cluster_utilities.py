@@ -8,7 +8,7 @@ from functional.utilities.cluster_extraction import extract_and_cluster
 
 
 def prepare_clusters_and_features(config: dict, clustering_config: dict, logger: logging.Logger,
-                                  train: bool, clean: bool = False):
+                                  train: bool, clean: bool = False, clustering_algorithm: str = "kmeans"):
     with open('config/feature_extraction/SIFT_config.yaml', 'r') as f:
         sift_config: dict = yaml.safe_load(f)
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger,
@@ -27,5 +27,6 @@ def prepare_clusters_and_features(config: dict, clustering_config: dict, logger:
                                                             logger,
                                                             train_loader,
                                                             train,
-                                                            clean=clean)
+                                                            clean=clean,
+                                                            clustering_algorithm=clustering_algorithm)
     return clusterer, descriptors, keypoints

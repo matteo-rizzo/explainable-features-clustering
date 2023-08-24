@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
+from sklearn.neighbors import KNeighborsClassifier
 from tqdm import tqdm
 
 from functional.utilities.utils import print_minutes, log_on_default
@@ -35,6 +36,7 @@ class Clusterer:
             if DEVICE == "GPU":
                 kwargs["affinity"] = kwargs.pop("metric")
             self.clusterer = AgglomerativeClustering(**kwargs)
+            self.knn = KNeighborsClassifier()
         elif algorithm.upper() == "KMEANS":
             self.clusterer = KMeans(**kwargs)
         # elif algorithm.upper() == "GMM":
@@ -48,18 +50,27 @@ class Clusterer:
         self.__logger.info(f"Running {self.__algorithm_name} fit_predict [k = {self.clusterer.n_clusters}]...")
         cluster_labels = self.clusterer.fit_predict(vectors)
         print_minutes(seconds=(time.perf_counter() - t0), input_str=self.__algorithm_name, logger=self.__logger)
+        if self.__algorithm_name == "HAC":
+            # Fit a knn classifier based on the labels of the clustering
+            self.knn.fit(vectors, self.clusterer.labels_)
         return cluster_labels
 
     def fit(self, vectors: np.ndarray) -> None:
         t0 = time.perf_counter()
         self.__logger.info(f"Running {self.__algorithm_name} fit [k = {self.clusterer.n_clusters}]...")
         self.clusterer.fit(vectors)
+        if self.__algorithm_name == "HAC":
+            # Fit a knn classifier based on the labels of the clustering
+            self.knn.fit(vectors, self.clusterer.labels_)
         print_minutes(seconds=(time.perf_counter() - t0), input_str=self.__algorithm_name, logger=self.__logger)
 
     def predict(self, vector: np.ndarray):
-        match self.__algorithm_name:
+        match self.__algorithm_name.upper():
             case "HDBSCAN":
+                # TODO: fixme
                 return self.clusterer.approximate_predict(self.clusterer, vector)
+            case "HAC":
+                return self.knn.predict(vector)
             # Case default
             case _:
                 return self.clusterer.predict(vector)
