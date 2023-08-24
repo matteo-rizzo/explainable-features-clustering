@@ -6,14 +6,12 @@ import yaml
 from torch.utils.data import DataLoader
 from torchmetrics import MetricCollection
 
-from classes.data.MaskHeatmapPetDataset import MaskHeatmapPetDataset
-from classes.deep_learning.CNNs.HyperSpectralCNN import HyperSpectralCNN
+from classes.data.mask_heatmap_based.MaskHeatmapPetDataset import MaskHeatmapPetDataset
 from classes.deep_learning.CNNs.SmarterCNN import SmarterCNN
 from functional.utilities.cluster_utilities import prepare_clusters_and_features
 from functional.utilities.data_utils import create_stratified_splits
 from functional.utilities.utils import default_logger
 from src.classes.core.Trainer import Trainer
-from classes.deep_learning.CNNs.CNN import CNN
 
 
 def main():

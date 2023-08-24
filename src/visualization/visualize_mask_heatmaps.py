@@ -3,10 +3,10 @@ import yaml
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from classes.data.MaskHeatmapPetDataset import MaskHeatmapPetDataset
+from classes.data.mask_heatmap_based.MaskHeatmapPetDataset import MaskHeatmapPetDataset
 from functional.utilities.utils import default_logger
 from functional.utilities.cluster_utilities import prepare_clusters_and_features
-from visualization.image_visualization import draw_9x9_activation, draw_1x1_activations
+from functional.utilities.image_visualization import draw_1x1_activations
 
 
 def main():
@@ -15,8 +15,6 @@ def main():
         config: dict = yaml.safe_load(f)
     with open('config/clustering/clustering_params.yaml', 'r') as f:
         clustering_config: dict = yaml.safe_load(f)
-    with open('config/training/hypeparameter_configuration.yaml', 'r') as f:
-        hyperparameters: dict = yaml.safe_load(f)
     # --- Logger ---
     logger = default_logger(config["logger"])
     # --- TRAIN DS ---

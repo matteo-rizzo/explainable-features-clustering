@@ -1,0 +1,9 @@
+"contrastThreshold": 0.01
+"edgeThreshold": 50
+# nOctaveLayers=3,
+# # (default = 3) Default should be ok
+# contrastThreshold=0.01,
+# # (default = 0.04) Lower = Include kps with lower contrast
+# edgeThreshold=30,
+# # (default = 10) Higher = Include KPS with lower edge response
+# sigma=1.6)

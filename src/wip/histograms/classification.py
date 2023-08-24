@@ -9,7 +9,7 @@ from torchmetrics import MetricCollection
 
 from src.classes.clustering.Clusterer import Clusterer
 from src.classes.core.Trainer import Trainer
-from src.classes.data.KeypointPetDataset import KeypointPetDataset
+from classes.data.keypoint_based.KeypointPetDataset import KeypointPetDataset
 from src.classes.data.OxfordIIITPetDataset import OxfordIIITPetDataset
 from src.classes.data.Vocabulary import Vocabulary
 from src.classes.deep_learning.FeedForwardNet import FeedForwardNet

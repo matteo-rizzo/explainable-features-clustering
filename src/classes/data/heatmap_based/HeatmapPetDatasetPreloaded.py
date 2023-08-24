@@ -1,6 +1,6 @@
 import torch
 
-from classes.data.HeatmapPetDataset import HeatmapPetDataset
+from classes.data.heatmap_based.HeatmapPetDataset import HeatmapPetDataset
 from src.classes.clustering.Clusterer import Clusterer
 
 

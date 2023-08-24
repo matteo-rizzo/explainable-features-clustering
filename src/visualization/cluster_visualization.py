@@ -29,7 +29,7 @@ def extract_patch(img, keypoint, patch_size: int = 24, larger_patch: int = 32): 
     right = min(x + larger_patch // 2, img.shape[1])
 
     patch = img[top:bottom, left:right]
-    # TODO: adjust patche based on rotation (make optional?)
+    # TODO: adjust patches based on rotation (make optional?)
     # positive rotation is correct
     rotated_patch = F.rotate(patch.unsqueeze(0), keypoint.angle, interpolation=F.InterpolationMode.BILINEAR).squeeze()
     smaller_patch = F.center_crop(rotated_patch, [patch_size, patch_size])
@@ -65,8 +65,8 @@ def plot_patches(patches_list, cluster_idx):
         ax.add_patch(rect)
 
     # Save the plot as an image file
-    Path("plots").mkdir(exist_ok=True)
-    plt.savefig(f'plots/patch_plot_{cluster_idx}.png')
+    Path("plots/patches").mkdir(exist_ok=True, parents=True)
+    plt.savefig(f'plots/patches/patch_plot_{cluster_idx}.png')
     plt.close()
 
 

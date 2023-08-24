@@ -27,7 +27,7 @@ hac_args:
 kmeans_args:
   # Euclidean should be ok
   # Normalize first? Becomes approximation of cosine
-  "n_clusters": 100
+  "n_clusters": 1024
   # Number of instances the k-means algorithm will be called with different seeds.
   # The final results will be from the instance that produces lowest inertia out of n_init instances.
   "n_init": 10
