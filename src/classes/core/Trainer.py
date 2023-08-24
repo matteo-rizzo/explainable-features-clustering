@@ -33,7 +33,7 @@ try:
     import wandb
     log_on_default("INFO", "Weights and Biases initialized.")
     log_on_default("INFO", "You might have to login with wandb.login(wandb.login(key=[your_api_key])...")
-    USE_WANDB: bool = False
+    USE_WANDB: bool = True
 except ImportError:
     log_on_default("INFO", "Weights and Biases not installed. Skipping its import.")
     USE_WANDB: bool = False
@@ -236,7 +236,9 @@ class Trainer:
         progress_bar = tqdm(enumerate(dataloader), total=batch_number, leave=True)
         # FIXME: something wrong in rolling metrics (I think)
         # rolling_metrics = [torch.tensor(0.0, device=self.device), ] * len(self.metrics)
+        average_loss: float = 0.0
         rolling_loss: float = 0.0
+        alpha = 0.9  # smoothing factor, between 0 and 1
         # --------------------------------------
         # Iterate dataloader
         for idx, (inputs, targets) in progress_bar:
@@ -252,11 +254,16 @@ class Trainer:
                 # For later compute
                 # result_dict = self.metrics(preds, targets)
                 self.metrics.update(preds, targets)
-                rolling_loss += self.__calculate_loss(preds, targets)
+                loss = self.__calculate_loss(preds, targets).item()
+                average_loss += loss
+                # Update rolling loss using running average
+                rolling_loss = alpha * rolling_loss + (1 - alpha) * loss
                 # rolling_metrics = [x + y for x, y in zip(rolling_metrics, result_dict.values())]
                 batch_desc = f"{colorstr('bold', 'white', f'[{split.upper()}]')}\t"
-                batch_desc += f"{colorstr('bold', 'magenta', f'{str(self.loss_fn)[:-2]}')}: " \
-                              f"{rolling_loss / (idx + 1):.3f}\t"  # TODO: fix
+                batch_desc += f"{colorstr('bold', 'magenta', f'Average {str(self.loss_fn)[:-2]}')}: " \
+                              f"{average_loss / (idx + 1):.3f}\t"
+                batch_desc += f"{colorstr('bold', 'magenta', f'Rolling {str(self.loss_fn)[:-2]}')}: " \
+                              f"{rolling_loss:.3f}\t"
                 # # batch_desc += "Calculating metrics"
                 # batch_desc += f"{colorstr('bold', 'magenta', f'{str(self.loss_fn)[:-2]}')}: {loss:.4f}"
                 # for metric_name, metric_value in zip(result_dict.keys(), rolling_metrics):
@@ -583,7 +590,7 @@ def test_trainer():
                                          num_classes=config["num_classes"]),
     })
     # # # --- Training ---
-    trainer = Trainer(HyperSpectralCNN,
+    trainer = Trainer(CNN,
                       config=config,
                       hyperparameters=hyperparameters,
                       metric_collection=metric_collection,

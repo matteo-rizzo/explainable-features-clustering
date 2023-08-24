@@ -1,0 +1,39 @@
+# ---------- Data configuration ----------
+num_classes: 47 # Food 101 / Pets 37
+img_size: 224
+num_channels: 3
+#  500 # # 50 words * 128 sift size * 16 windows
+
+# --- Training operative configuration ---
+device: "cuda:0" # Cuda device, i.e. 0 or 0,1,2,3 or cpu
+workers: 0 # Maximum number of dataloader workers
+batch_size: 50
+# Total batch size for all GPUs
+# nominal_batch_size: 20 # ONLY IF ACCUMULATE TRUE
+
+epochs: 30 # Number of training epochs
+
+optimizer: "Adam" # [SGD ,Adam ,AdamW, SparseAdam]
+criterion: "CrossEntropyLoss" # [NLLLoss, CrossEntropyLoss]
+inference: "Softmax" # [Softmax, Sigmoid]
+linear_lr: False # linear learning rate (decay)
+
+# Flags
+half_precision: True
+# warmup: False
+# accumulate: False
+
+resume: False # Resume most recent training. True = latest, can be string to a specific checkpoint
+nosave: False # Only save final checkpoint
+notest: False # Only test final epoch
+test_on_train: True # Test metrics on train data
+test_on_val: True # Test metrics on val data
+logger: "INFO"
+
+# --- Configuration files and paths ---
+architecture_config: "default"
+weights: "" # Initial weights path
+hyperparameters: "config/training/hypeparameter_configuration.yaml"  # Hyperparameters path
+project: "dumps/train" # save to project/name
+name: "dtd_simple_train" # save to project/name
+exist_ok: False # existing project/name ok, do not increment
