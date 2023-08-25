@@ -3,6 +3,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torchvision.transforms.functional as F
 import yaml
@@ -90,9 +91,10 @@ def plot_cluster_sift_patches():
 
     clusterer, descriptors, keypoints = extract_and_cluster(clustering_config, key_points_extractor, logger,
                                                             train_loader, clustering_algorithm="hac")
-
     # --- PLOTTING ---
     cluster_patches = defaultdict(list)
+    _, counts = np.unique(clusterer.clusterer.labels_, return_counts=True)
+    logger.info(f"{counts[:8]}")
     for idx, (img, label) in tqdm(enumerate(train_loader), desc="Extracting patches...", total=len(train_loader)):
         img = img.squeeze()
         img_descriptors = descriptors[idx]
