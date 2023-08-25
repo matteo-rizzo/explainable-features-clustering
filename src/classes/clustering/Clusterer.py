@@ -50,7 +50,7 @@ class Clusterer:
         self.__logger.info(f"Running {self.__algorithm_name} fit_predict [k = {self.clusterer.n_clusters}]...")
         cluster_labels = self.clusterer.fit_predict(vectors)
         print_minutes(seconds=(time.perf_counter() - t0), input_str=self.__algorithm_name, logger=self.__logger)
-        if self.__algorithm_name == "HAC":
+        if self.__algorithm_name.upper() == "HAC":
             # Fit a knn classifier based on the labels of the clustering
             self.knn.fit(vectors, self.clusterer.labels_)
         return cluster_labels
@@ -59,7 +59,7 @@ class Clusterer:
         t0 = time.perf_counter()
         self.__logger.info(f"Running {self.__algorithm_name} fit [k = {self.clusterer.n_clusters}]...")
         self.clusterer.fit(vectors)
-        if self.__algorithm_name == "HAC":
+        if self.__algorithm_name.upper() == "HAC":
             # Fit a knn classifier based on the labels of the clustering
             self.knn.fit(vectors, self.clusterer.labels_)
         print_minutes(seconds=(time.perf_counter() - t0), input_str=self.__algorithm_name, logger=self.__logger)
