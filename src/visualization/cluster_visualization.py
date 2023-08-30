@@ -91,7 +91,7 @@ def plot_cluster_sift_patches():
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
 
     clusterer, descriptors, keypoints = extract_and_cluster(clustering_config, key_points_extractor, logger,
-                                                            train_loader, clustering_algorithm="hdbscan")
+                                                            train_loader, clustering_algorithm="kmeans")
     # --- PLOTTING ---
     cluster_patches = defaultdict(list)
     _, counts = np.unique(clusterer.clusterer.labels_, return_counts=True)
@@ -99,10 +99,10 @@ def plot_cluster_sift_patches():
                                     clusterer.get_centroids(),
                                     clusterer.clusterer.labels_,
                                     False)
-    top_100 = [r[0] for r in ranks[:100]]
+    top_clusters = [r[0] for r in ranks[:50]]
     # print(top_100)
-    logger.info(f"{len(counts)}")
-    logger.info(f"{counts[:8]}")
+    logger.info(f"Num clusters: {len(counts)}")
+    logger.info(f"Dimensions of top 8 clusters: {counts[:8]}")
     for idx, (img, label) in tqdm(enumerate(train_loader), desc="Extracting patches...", total=len(train_loader)):
         img = img.squeeze()
         img_descriptors = descriptors[idx]
@@ -115,7 +115,7 @@ def plot_cluster_sift_patches():
 
     # Remove superfluous
     for i in range(len(ranks)):
-        if i not in top_100:
+        if i not in top_clusters:
             cluster_patches.pop(i)
     # print(cluster_patches)
     for i in tqdm(cluster_patches.keys(), desc="Saving plots"):

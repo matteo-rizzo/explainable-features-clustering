@@ -25,10 +25,11 @@ def main():
                                           clusterer_train.get_centroids(),
                                           clusterer_train.clusterer.labels_,
                                           False)
-    top_100 = [r[0] for r in ranks[:100]]
+    top_50 = [r[0] for r in ranks[:50]]
     # train_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=True)
     train_ds = MaskHeatmapPetDataset(keypoints_train, descriptors_train,
-                                     clusterer_train, train=True, top_clusters=top_100)
+                                     clusterer_train, train=True
+                                     , top_clusters=top_50)
 
     loader_ds = torch.utils.data.DataLoader(train_ds,
                                             batch_size=5,

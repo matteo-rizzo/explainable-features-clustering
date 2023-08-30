@@ -60,6 +60,8 @@ def kps_to_mask_heatmaps(image,
                          heatmap_args: tuple[int, int, int],
                          cluster_index_map: dict | None = None):
     layers, img_w, img_h = heatmap_args
+    max_sigma = 25.0 # Avoid keypoints becoming too big
+    min_sigma = 5.0 # Avoid keypoints being too little
     heatmap = torch.zeros(heatmap_args)
     # Generate a grid of coordinates corresponding to the heatmap indices
     x_indices, y_indices = torch.meshgrid(torch.arange(img_w), torch.arange(img_h), indexing='ij')
@@ -68,7 +70,6 @@ def kps_to_mask_heatmaps(image,
     for kp in kps:
         coords.append(kp.pt)
         scales.append(kp.size)
-
     # Just scale because rotation information is embedded in pixels
     for idx, cluster_idx in enumerate(cluster_indexes):
         # Skip the ones that are not in the top
@@ -78,7 +79,8 @@ def kps_to_mask_heatmaps(image,
 
             # Calculate the squared distance from each grid point to the center (0, 0)
             squared_dist = (x_indices - x_coord) ** 2 + (y_indices - y_coord) ** 2
-            sigma = scales[idx]  # stddev / sqrt of variance
+            sigma = min(scales[idx], max_sigma)  # stddev / sqrt of variance
+            sigma = max(sigma, min_sigma)
             # Calculate the Gaussian distribution
             gaussian = torch.exp(-squared_dist / (2 * sigma ** 2))
             # Add the Gaussian values to the heatmap for the corresponding cluster

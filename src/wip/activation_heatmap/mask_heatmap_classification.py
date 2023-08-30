@@ -107,58 +107,59 @@ def pruned_main():
                                           clusterer_train.get_centroids(),
                                           clusterer_train.clusterer.labels_,
                                           False)
-    top_100 = [r[0] for r in ranks[:100]]
+    top_clusters = [r[0] for r in ranks[:50]]
 
     train_ds = MaskHeatmapPetDataset(keypoints_train, descriptors_train,
                                      clusterer_train, train=True,
-                                     top_clusters=top_100)
-    print(train_ds[0][0].shape, train_ds[0][1])
-    # train_size: int = int(len(train_ds) * 0.8)
-    # test_size: int = len(train_ds) - train_size
-    # train_split, val_split = create_stratified_splits(train_ds, train_size=train_size, test_size=test_size)
-    # train_loader_ds = torch.utils.data.DataLoader(train_split,
-    #                                               batch_size=config["batch_size"],
-    #                                               shuffle=True,
-    #                                               num_workers=config["workers"],
-    #                                               drop_last=False)
-    # # --- VAL DS ---
-    # val_loader_ds = torch.utils.data.DataLoader(val_split,
-    #                                             batch_size=config["batch_size"],
-    #                                             shuffle=True,
-    #                                             num_workers=config["workers"],
-    #                                             drop_last=False)
-    # # --- TEST DS ---
-    # clusterer_test, descriptors_test, keypoints_test = prepare_clusters_and_features(config,
-    #                                                                                  clustering_config,
-    #                                                                                  logger,
-    #                                                                                  train=False)
-    # # test_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=False)
-    # test_ds = MaskHeatmapPetDataset(keypoints_test, descriptors_test, clusterer_test, train=False)
-    # test_loader_ds = torch.utils.data.DataLoader(test_ds,
-    #                                              batch_size=config["batch_size"],
-    #                                              shuffle=False,
-    #                                              num_workers=config["workers"],
-    #                                              drop_last=False)
-    # # --- Metrics for training ---
-    # metric_collection = MetricCollection({
-    #     'accuracy': torchmetrics.Accuracy(task="multiclass",
-    #                                       num_classes=config["num_classes"]),
-    #     # 'macro_F1': torchmetrics.F1Score(task="multiclass",
-    #     #                                  average="micro",
-    #     #                                  num_classes=config["num_classes"]),
-    #     # 'micro_F1': torchmetrics.F1Score(task="multiclass",
-    #     #                                  average="micro",
-    #     #                                  num_classes=config["num_classes"]),
-    # })
-    # # --- Training ---
-    # trainer = Trainer(SmarterCNN,
-    #                   config=config,
-    #                   hyperparameters=hyperparameters,
-    #                   metric_collection=metric_collection,
-    #                   logger=logger)
-    # trainer.train(train_dataloader=train_loader_ds,
-    #               val_dataloader=val_loader_ds,
-    #               test_dataloader=test_loader_ds)
+                                     top_clusters=top_clusters)
+    # print(train_ds[0][0].shape, train_ds[0][1])
+    train_size: int = int(len(train_ds) * 0.8)
+    test_size: int = len(train_ds) - train_size
+    train_split, val_split = create_stratified_splits(train_ds, train_size=train_size, test_size=test_size)
+    train_loader_ds = torch.utils.data.DataLoader(train_split,
+                                                  batch_size=config["batch_size"],
+                                                  shuffle=True,
+                                                  num_workers=config["workers"],
+                                                  drop_last=False)
+    # --- VAL DS ---
+    val_loader_ds = torch.utils.data.DataLoader(val_split,
+                                                batch_size=config["batch_size"],
+                                                shuffle=True,
+                                                num_workers=config["workers"],
+                                                drop_last=False)
+    # --- TEST DS ---
+    clusterer_test, descriptors_test, keypoints_test = prepare_clusters_and_features(config,
+                                                                                     clustering_config,
+                                                                                     logger,
+                                                                                     train=False)
+    # test_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=False)
+    test_ds = MaskHeatmapPetDataset(keypoints_test, descriptors_test, clusterer_test,
+                                    train=False, top_clusters=top_clusters)
+    test_loader_ds = torch.utils.data.DataLoader(test_ds,
+                                                 batch_size=config["batch_size"],
+                                                 shuffle=False,
+                                                 num_workers=config["workers"],
+                                                 drop_last=False)
+    # --- Metrics for training ---
+    metric_collection = MetricCollection({
+        'accuracy': torchmetrics.Accuracy(task="multiclass",
+                                          num_classes=config["num_classes"]),
+        # 'macro_F1': torchmetrics.F1Score(task="multiclass",
+        #                                  average="micro",
+        #                                  num_classes=config["num_classes"]),
+        # 'micro_F1': torchmetrics.F1Score(task="multiclass",
+        #                                  average="micro",
+        #                                  num_classes=config["num_classes"]),
+    })
+    # --- Training ---
+    trainer = Trainer(SmarterCNN,
+                      config=config,
+                      hyperparameters=hyperparameters,
+                      metric_collection=metric_collection,
+                      logger=logger)
+    trainer.train(train_dataloader=train_loader_ds,
+                  val_dataloader=val_loader_ds,
+                  test_dataloader=test_loader_ds)
 
 
 if __name__ == "__main__":

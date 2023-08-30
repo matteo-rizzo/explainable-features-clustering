@@ -32,15 +32,17 @@ class MaskHeatmapPetDataset(Dataset):
         self.descriptors: list[np.ndarray] = descriptors
         self.clustering: Clusterer = clustering
         self.top_clusters: list[int] = top_clusters
-        if top_clusters:
-            # Map index of top clusters (which are in 0-n_clusters) to 0-n_top_clusters (e.g. 0-100)
-            # k, v reverse because we want the mapping cluster_index to new index
-            self.__cluster_index_map: dict = {k: v for v, k in enumerate(top_clusters)}
+        # Map index of top clusters (which are in 0-n_clusters) to 0-n_top_clusters (e.g. 0-100)
+        # k, v reverse because we want the mapping cluster_index to new index
+        self.__cluster_index_map: dict | None = {k: v for v, k in enumerate(top_clusters)} if top_clusters else None
 
     def __getitem__(self, index: int):
         image, label = self.data[index]
         predictions = self.clustering.predict(self.descriptors[index])
-        top_predictions = np.array([p if p in self.top_clusters else -1 for p in predictions])
+        if self.top_clusters:
+            top_predictions = np.array([p if p in self.top_clusters else -1 for p in predictions])
+        else:
+            top_predictions = predictions
         num_layers = self.clustering.n_clusters() if self.top_clusters is None else len(self.top_clusters)
         heatmap = kps_to_mask_heatmaps(image,
                                        self.keypoints[index],
