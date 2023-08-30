@@ -13,17 +13,16 @@ umap_args_3d:
   "metric": "euclidean"
 
 hdbscan_args:
-  "min_cluster_size": 100
-  "min_samples": 1
+  "min_cluster_size": 20
+  "min_samples": 20
   "cluster_selection_method": "eom"
-  "cluster_selection_epsilon": 0.5
+  "cluster_selection_epsilon": 0.0 # 0.5
   "metric": "euclidean"
   "prediction_data": True
 
 hac_args:
-  "n_clusters": 100
-  "metric": "cosine"
-  "connectivity": "pairwise"
+  "n_clusters": 1024
+  "metric": "euclidean"
 
 kmeans_args:
   # Euclidean should be ok

@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import yaml
 from torch.utils.data import Dataset
@@ -20,8 +21,14 @@ def main():
     # --- TRAIN DS ---
     clusterer_train, descriptors_train, keypoints_train = prepare_clusters_and_features(config, clustering_config,
                                                                                         logger, train=True)
+    ranks = clusterer_train.rank_clusters(np.concatenate(descriptors_train),
+                                          clusterer_train.get_centroids(),
+                                          clusterer_train.clusterer.labels_,
+                                          False)
+    top_100 = [r[0] for r in ranks[:100]]
     # train_ds = HeatmapPetDataset(keypoints, descriptors, clusterer, train=True)
-    train_ds = MaskHeatmapPetDataset(keypoints_train, descriptors_train, clusterer_train, train=True)
+    train_ds = MaskHeatmapPetDataset(keypoints_train, descriptors_train,
+                                     clusterer_train, train=True, top_clusters=top_100)
 
     loader_ds = torch.utils.data.DataLoader(train_ds,
                                             batch_size=5,

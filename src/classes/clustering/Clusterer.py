@@ -47,7 +47,9 @@ class Clusterer:
 
     def fit_predict(self, vectors: np.ndarray) -> np.ndarray:
         t0 = time.perf_counter()
-        self.__logger.info(f"Running {self.__algorithm_name} fit_predict [k = {self.clusterer.n_clusters}]...")
+
+        n_clusters: int | str = self.clusterer.n_clusters if self.__algorithm_name.upper() != "HDBSCAN" else "NA"
+        self.__logger.info(f"Running {self.__algorithm_name} fit_predict [k = {n_clusters}]...")
         cluster_labels = self.clusterer.fit_predict(vectors)
         print_minutes(seconds=(time.perf_counter() - t0), input_str=self.__algorithm_name, logger=self.__logger)
         if self.__algorithm_name.upper() == "HAC":
@@ -86,19 +88,22 @@ class Clusterer:
         return self.clusterer.cluster_centers_
 
     @staticmethod
-    def rank_clusters(data: np.ndarray, centroids: np.ndarray, labels: list | np.ndarray, print_values: bool = False) -> \
+    def rank_clusters(data: np.ndarray | list,
+                      centroids: np.ndarray | list,
+                      labels: list | np.ndarray,
+                      print_values: bool = False) -> \
             list[tuple]:
         # TODO: check
         clusters_ranking = []
         # Labels are assumed to be in range [0-num_labels]
         for i in tqdm(range(len(np.unique(labels))), desc="Ranking clusters"):
             cluster_variance = np.var(data[labels == i])
-            # Tolgo axis = 0, perché in quel modo stai calcolando la varianza delle feature separate
-            # E le feature di SIFT sono interdipendenti
-            # cluster_variance = np.var(data[labels == i], axis=0)
             cluster_distance = np.linalg.norm(data[labels == i] - centroids[i], axis=1)
-            # Also changed, perché voglio valori medi
-            clusters_ranking.append((i, cluster_variance / np.mean(cluster_distance)))
+            cluster_size = np.sum(labels == i)
+            # TODO: EVALUATE DIMENSION
+            # Seems good!
+            importance_score = (cluster_variance / np.mean(cluster_distance)) / (cluster_size / len(data))
+            clusters_ranking.append((i, importance_score))
 
         # print(silhouette_score(data, labels))
         # Calinski-Harabasz index and Davies-Bouldin index evaluate the overall quality of clustering based on
@@ -107,7 +112,7 @@ class Clusterer:
         # print(davies_bouldin_score(data, labels))
         # print(silhouette_score(data, labels))
 
-        clusters_ranking = sorted(clusters_ranking, key=lambda x: x[1], reverse=True)
+        clusters_ranking = sorted(clusters_ranking, key=lambda x: x[1], reverse=False)
         if print_values:
             for i, ranking in enumerate(clusters_ranking):
                 print(f"[{i}] Cluster {ranking[0]}: Importance Score = {ranking[1]}")

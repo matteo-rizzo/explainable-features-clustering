@@ -62,7 +62,8 @@ def plot_patches(patches_list, cluster_idx):
         ax.axis('off')
 
         # Add red square around the center of the patch
-        rect = patches.Rectangle((4, 4), 16, 16, linewidth=2, edgecolor='red', facecolor='none')
+        rect = patches.Rectangle((4, 4), 16, 16,
+                                 linewidth=2, edgecolor='red', facecolor='none')
         ax.add_patch(rect)
 
     # Save the plot as an image file
@@ -90,10 +91,17 @@ def plot_cluster_sift_patches():
     key_points_extractor = FeatureExtractingAlgorithm(algorithm="SIFT", logger=logger)
 
     clusterer, descriptors, keypoints = extract_and_cluster(clustering_config, key_points_extractor, logger,
-                                                            train_loader, clustering_algorithm="hac")
+                                                            train_loader, clustering_algorithm="hdbscan")
     # --- PLOTTING ---
     cluster_patches = defaultdict(list)
     _, counts = np.unique(clusterer.clusterer.labels_, return_counts=True)
+    ranks = clusterer.rank_clusters(np.concatenate(descriptors),
+                                    clusterer.get_centroids(),
+                                    clusterer.clusterer.labels_,
+                                    False)
+    top_100 = [r[0] for r in ranks[:100]]
+    # print(top_100)
+    logger.info(f"{len(counts)}")
     logger.info(f"{counts[:8]}")
     for idx, (img, label) in tqdm(enumerate(train_loader), desc="Extracting patches...", total=len(train_loader)):
         img = img.squeeze()
@@ -105,7 +113,12 @@ def plot_cluster_sift_patches():
                              img_descriptors_clusters,
                              cluster_patches)
 
-    for i in tqdm(range(clustering_config["kmeans_args"]["n_clusters"]), desc="Saving plots"):
+    # Remove superfluous
+    for i in range(len(ranks)):
+        if i not in top_100:
+            cluster_patches.pop(i)
+    # print(cluster_patches)
+    for i in tqdm(cluster_patches.keys(), desc="Saving plots"):
         plot_patches(cluster_patches[i], i)
 
 

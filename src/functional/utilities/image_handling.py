@@ -57,7 +57,8 @@ def kps_to_heatmaps(kps: tuple[cv2.KeyPoint], cluster_indexes: np.ndarray[int], 
 def kps_to_mask_heatmaps(image,
                          kps: tuple[cv2.KeyPoint],
                          cluster_indexes: np.ndarray[int],
-                         heatmap_args: tuple[int, int, int]):
+                         heatmap_args: tuple[int, int, int],
+                         cluster_index_map: dict | None = None):
     layers, img_w, img_h = heatmap_args
     heatmap = torch.zeros(heatmap_args)
     # Generate a grid of coordinates corresponding to the heatmap indices
@@ -70,16 +71,23 @@ def kps_to_mask_heatmaps(image,
 
     # Just scale because rotation information is embedded in pixels
     for idx, cluster_idx in enumerate(cluster_indexes):
-        # Shift the coordinates so that the keypoint is at the origin
-        y_coord, x_coord = coords[idx]
+        # Skip the ones that are not in the top
+        if cluster_idx != -1:
+            # Shift the coordinates so that the keypoint is at the origin
+            y_coord, x_coord = coords[idx]
 
-        # Calculate the squared distance from each grid point to the center (0, 0)
-        squared_dist = (x_indices - x_coord) ** 2 + (y_indices - y_coord) ** 2
-        sigma = scales[idx]  # stddev / sqrt of variance
-        # Calculate the Gaussian distribution
-        gaussian = torch.exp(-squared_dist / (2 * sigma ** 2))
-        # Add the Gaussian values to the heatmap for the corresponding cluster
-        heatmap[cluster_idx] += gaussian
+            # Calculate the squared distance from each grid point to the center (0, 0)
+            squared_dist = (x_indices - x_coord) ** 2 + (y_indices - y_coord) ** 2
+            sigma = scales[idx]  # stddev / sqrt of variance
+            # Calculate the Gaussian distribution
+            gaussian = torch.exp(-squared_dist / (2 * sigma ** 2))
+            # Add the Gaussian values to the heatmap for the corresponding cluster
+            # If value needs to be mapped
+            if cluster_index_map:
+                heatmap[cluster_index_map[cluster_idx]] += gaussian
+            # Otherwise
+            else:
+                heatmap[cluster_idx] += gaussian
     # Normalize to max 1
     heatmap /= heatmap.max()
     heatmap = image * heatmap

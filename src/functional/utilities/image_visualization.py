@@ -1,8 +1,11 @@
+from pathlib import Path
+
 import torch
 from matplotlib import pyplot as plt
 
 
 def draw_1x1_activations(activation_maps, label: str = "Activation"):
+    Path("plots/activations").mkdir(exist_ok=True, parents=True)
     # Iterate batches
     for i, tensor in enumerate(activation_maps):
         # Iterate channels

@@ -14,7 +14,8 @@ class MaskHeatmapPetDataset(Dataset):
                  descriptors: list,
                  clustering: Clusterer,
                  root: str = "dataset",
-                 train: bool = True):
+                 train: bool = True,
+                 top_clusters: list[int] | None = None):
         transforms = T.Compose([
             T.ToTensor(),
             T.Resize(224, antialias=True),
@@ -30,14 +31,22 @@ class MaskHeatmapPetDataset(Dataset):
         self.keypoints: list[tuple[cv2.KeyPoint]] = keypoints
         self.descriptors: list[np.ndarray] = descriptors
         self.clustering: Clusterer = clustering
-
+        self.top_clusters: list[int] = top_clusters
+        if top_clusters:
+            # Map index of top clusters (which are in 0-n_clusters) to 0-n_top_clusters (e.g. 0-100)
+            # k, v reverse because we want the mapping cluster_index to new index
+            self.__cluster_index_map: dict = {k: v for v, k in enumerate(top_clusters)}
 
     def __getitem__(self, index: int):
         image, label = self.data[index]
+        predictions = self.clustering.predict(self.descriptors[index])
+        top_predictions = np.array([p if p in self.top_clusters else -1 for p in predictions])
+        num_layers = self.clustering.n_clusters() if self.top_clusters is None else len(self.top_clusters)
         heatmap = kps_to_mask_heatmaps(image,
                                        self.keypoints[index],
-                                       self.clustering.predict(self.descriptors[index]),
-                                       (self.clustering.n_clusters(), 224, 224))
+                                       top_predictions,
+                                       (num_layers, 224, 224),
+                                       self.__cluster_index_map)
         return heatmap, label
 
     def __len__(self):

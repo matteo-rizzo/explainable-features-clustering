@@ -25,6 +25,8 @@ def extract_and_cluster(clustering_config: dict,
     if clean and containing_folder.exists():
         shutil.rmtree(containing_folder)
     containing_folder.mkdir(exist_ok=True)
+    n_clusters: int = clustering_config[f"{clustering_algorithm}_args"]["n_clusters"] \
+        if clustering_algorithm.upper() != "HDBSCAN" else "NA"
     # --------------------------------------------------------------------------------------------------
     # --- KPS & DESCRIPTORS ---
     keypoints_file = containing_folder / f'keypoints_{"train" if train else "test"}.joblib'
@@ -52,7 +54,7 @@ def extract_and_cluster(clustering_config: dict,
     # Note: clustering should be done on train data only ? TODO: verify
     clustering_file = containing_folder / (f'clustering_'
                                            f'{clustering_algorithm}_'
-                                           f'{clustering_config[f"{clustering_algorithm}_args"]["n_clusters"]}'
+                                           f'{n_clusters}'
                                            f'.joblib')
     # --- LOAD FROM FILE ---
     if os.path.exists(clustering_file):
@@ -61,7 +63,7 @@ def extract_and_cluster(clustering_config: dict,
         # Load clustering results from file
         clusterer = joblib.load(clustering_file)
         logger.info(f"Loaded {clustering_algorithm} clustering results "
-                    f'[k = {clustering_config[f"{clustering_algorithm}_args"]["n_clusters"]}] '
+                    f'[k = {n_clusters}] '
                     f"from file in {(time.perf_counter() - t0):.2f}s.")
     # --- CREATE NEW & SAVE TO FILE ---
     else:
@@ -113,3 +115,37 @@ def list_to_keypoints(listified_kps: list):
             keypoints.append(kp)
         overall_kps.append(tuple(keypoints))
     return overall_kps
+
+# Che succede se apro/chiudo negozio/museo prima?
+# Individuare fonte di dati
+# Come utilizzare i dati per modellare il flusso dei turisti
+# AlmaViva può già accedere alle celle telefoniche; tipo come si muovono i turisti
+# Come poi utilizzarle?
+# Sistemi che fanno queste cose qui; come modellare il flusso di turisti e
+# come alterare i parametri per avere cose alternative
+# - Rappresentazione dei turisti (propriet' utili)
+# Dati rilevanti e quali NON rilevanti; dati meteo possono tornare utili ad esempio
+# Modelli per la rappresentazione del movimento dei turisti. Secondo quali regole?
+# Review di serie spazio temporali, traiettorie e clustering##
+
+# Favorire turismo sostenibile
+# Esempio Data Appeal
+
+# Come si rappresenta il turista?
+# Come si rappresenta un POI?
+# Come si formalizzano un po' tutte le cose; POI
+
+# La ricerca bibliografica riguarderà i seguenti temi:
+# Rappresentazione dei turisti
+# Dati rilevanti e non rilevanti per l’analisi dei turisti
+# Modelli per la rappresentazione del movimento dei turisti
+# Review delle serie spazio-temporali, traiettorie e loro clustering
+
+# Dato as granular as possible
+# Modelli generici per aggiungere fonti arbitrarie a fonti di base
+# Risvolto commerciale
+# Simulazione delle variabili
+# Magari dataset
+
+# Spreading out tourist: estimating parameters before moving manopole?
+# Simulation?
