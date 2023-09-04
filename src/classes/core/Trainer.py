@@ -280,8 +280,12 @@ class Trainer:
         current_lr: float = self.optimizer.param_groups[0]['lr']
         epoch_desc = f"{colorstr('bold', 'white', f'[{split.title()} Metrics]')} "
         for metric_name, metric_value in zip(results.keys(), results.values()):
+            # --- METRICS ---
             epoch_desc += f"\t{colorstr('bold', 'magenta', f'{metric_name.title()}')}: " \
                           f"{metric_value :.3f}"
+            if USE_WANDB:
+                self.wandb_run.log({f"{split}_{metric_name}": metric_value})
+        # ----- LR -----
         epoch_desc += (f"\t{colorstr('bold', 'white', '[Parameters]')} "
                        f"{colorstr('bold', 'yellow', 'Current lr')} : {current_lr:.3f} "
                        f"(-{self.optimizer.defaults['lr'] - current_lr:.3f})")
