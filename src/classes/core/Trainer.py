@@ -254,7 +254,7 @@ class Trainer:
                 # For later compute
                 # result_dict = self.metrics(preds, targets)
                 self.metrics.update(preds, targets)
-                loss = self.__calculate_loss(preds, targets).item()
+                loss = self._calculate_loss(pred_logits, targets).item()
                 average_loss += loss
                 # Update rolling loss using running average
                 rolling_loss = alpha * rolling_loss + (1 - alpha) * loss
@@ -315,7 +315,7 @@ class Trainer:
                 with amp.autocast(enabled=self.device.type[:4] == "cuda"):
                     # --- Forward pass ---
                     preds = self.model(inputs.to(self.config["device"]))
-                    loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
+                    loss = self._calculate_loss(preds, targets.to(self.config["device"]))
 
                 # --- Backward (not recommended to be under autocast) ---
                 self.gradient_scaler.scale(loss).backward()
@@ -324,7 +324,7 @@ class Trainer:
                 self.gradient_scaler.update()
             else:
                 preds = self.model(inputs.to(self.config["device"]))
-                loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
+                loss = self._calculate_loss(preds, targets.to(self.config["device"]))
                 loss.backward()
                 self.optimizer.step()
             # --- Wandb logging ---
@@ -352,7 +352,7 @@ class Trainer:
         return epoch_description
         # --------------------------------------
 
-    def __calculate_loss(self, preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    def _calculate_loss(self, preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         # TODO: possibly add other parameters
         loss = self.loss_fn(preds, targets.to(self.config["device"]))
         return loss
