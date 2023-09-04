@@ -215,10 +215,8 @@ class Trainer:
             if val_dataloader:
                 if self.config["test_on_val"]:
                     self.__compute_metrics(val_dataloader, split="valid")
-                # FIXME: CALCULATE LOSS
             # Test on test data, if so chosen (or final epoch)
             if test_dataloader:
-                # FIXME: CALCULATE LOSS
                 results = self.__compute_metrics(test_dataloader, split="test")
                 results_values = [r.cpu() for r in results.values()]
         # No test set was given and training has finished
@@ -234,8 +232,6 @@ class Trainer:
         # --- Console logging ---
         batch_number: int = len(dataloader)
         progress_bar = tqdm(enumerate(dataloader), total=batch_number, leave=True)
-        # FIXME: something wrong in rolling metrics (I think)
-        # rolling_metrics = [torch.tensor(0.0, device=self.device), ] * len(self.metrics)
         average_loss: float = 0.0
         rolling_loss: float = 0.0
         alpha = 0.9  # smoothing factor, between 0 and 1
@@ -246,18 +242,19 @@ class Trainer:
             targets = targets.to(self.device)
 
             with torch.no_grad():
+                # ----------------------------------------------------
                 pred_logits = self.model(inputs)
-                # Softmax/Sigmoid/Whatever selected
-                # Not strictly necessary for torchmetrics but still good practice
-                preds = self.activation(pred_logits)
-                # loss = self.__calculate_loss(preds, targets.to(self.config["device"]))
-                # For later compute
-                # result_dict = self.metrics(preds, targets)
-                self.metrics.update(preds, targets)
                 loss = self._calculate_loss(pred_logits, targets).item()
                 average_loss += loss
                 # Update rolling loss using running average
                 rolling_loss = alpha * rolling_loss + (1 - alpha) * loss
+                # ----------------------------------------------------
+                # Softmax/Sigmoid/Whatever selected
+                # Not strictly necessary for torchmetrics but still good practice
+                preds = self.activation(pred_logits)
+                # For later compute
+                self.metrics.update(preds, targets)
+                # ----------------------------------------------------
                 # rolling_metrics = [x + y for x, y in zip(rolling_metrics, result_dict.values())]
                 batch_desc = f"{colorstr('bold', 'white', f'[{split.upper()}]')}\t"
                 batch_desc += f"{colorstr('bold', 'magenta', f'Average {str(self.loss_fn)[:-2]}')}: " \
@@ -271,9 +268,6 @@ class Trainer:
                 #                   f"{metric_value / (idx + 1):.3f}\t"  # TODO: fix
                 progress_bar.set_description(batch_desc)
         # --------------------------------------
-        ######### Print per-epoch metrics (test only)
-        ######### if split == "test":
-
         # Compute the result for each metric in the collection.
         results = self.metrics.compute()
         # Note down current learning rate
